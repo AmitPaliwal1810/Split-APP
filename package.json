@@ -1,0 +1,35 @@
+{
+  "name": "split-app",
+  "version": "1.0.0",
+  "main": "node_modules/expo/AppEntry.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "eject": "expo eject"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@expo/vector-icons": "^15.0.3",
+    "@react-navigation/native": "^7.1.18",
+    "@react-navigation/stack": "^7.5.0",
+    "expo": "^54.0.19",
+    "expo-status-bar": "^3.0.8",
+    "react": "19.1.0",
+    "react-native": "0.81.5",
+    "react-native-gesture-handler": "~2.28.0",
+    "react-native-safe-area-context": "^5.6.1",
+    "react-native-screens": "~4.16.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.28.4",
+    "@types/react": "~19.1.10",
+    "@types/react-native": "^0.72.8",
+    "babel-preset-expo": "^54.0.6",
+    "typescript": "^5.9.3"
+  }
+}
