@@ -1,5 +1,7 @@
 # Split Bills App
 
+> **⚠️ WORK IN PROGRESS** - This project is currently under active development.
+
 A modern React Native application for splitting bills and managing group expenses, built with Expo, TypeScript, and Firebase.
 
 ## Features
