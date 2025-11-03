@@ -9,9 +9,8 @@ import {
   Alert,
 } from 'react-native';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
-import { doc, onSnapshot } from 'firebase/firestore';
-import { ref, onValue } from 'firebase/database';
-import { db, realtimeDb } from '@services/firebase';
+import firestore from '@react-native-firebase/firestore';
+import database from '@react-native-firebase/database';
 import { useTheme } from '@contexts/ThemeContext';
 import { useAuth } from '@contexts/AuthContext';
 import { Group, Expense } from '@types/index';
@@ -33,15 +32,18 @@ export const GroupDetailScreen: React.FC = () => {
 
   useEffect(() => {
     // Listen to Firestore for group data
-    const unsubscribeGroup = onSnapshot(doc(db, 'groups', groupId), (doc) => {
-      if (doc.exists()) {
-        setGroup({ id: doc.id, ...doc.data() } as Group);
-      }
-    });
+    const unsubscribeGroup = firestore()
+      .collection('groups')
+      .doc(groupId)
+      .onSnapshot((doc) => {
+        if (doc.exists) {
+          setGroup({ id: doc.id, ...doc.data() } as Group);
+        }
+      });
 
     // Listen to Realtime Database for instant expense updates
-    const expensesRef = ref(realtimeDb, `expenses/${groupId}`);
-    const unsubscribeExpenses = onValue(expensesRef, (snapshot) => {
+    const expensesRef = database().ref(`expenses/${groupId}`);
+    const unsubscribeExpenses = expensesRef.on('value', (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.val();
         const expensesArray = Object.keys(data).map((key) => ({
@@ -56,7 +58,7 @@ export const GroupDetailScreen: React.FC = () => {
 
     return () => {
       unsubscribeGroup();
-      unsubscribeExpenses();
+      expensesRef.off('value');
     };
   }, [groupId]);
 

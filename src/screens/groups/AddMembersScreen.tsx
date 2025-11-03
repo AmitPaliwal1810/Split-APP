@@ -12,8 +12,7 @@ import {
 import { useRoute, useNavigation } from '@react-navigation/native';
 import * as Contacts from 'expo-contacts';
 import * as SMS from 'expo-sms';
-import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
-import { db } from '@services/firebase';
+import firestore from '@react-native-firebase/firestore';
 import { useTheme } from '@contexts/ThemeContext';
 import { Contact } from '@types/index';
 import { Ionicons } from '@expo/vector-icons';

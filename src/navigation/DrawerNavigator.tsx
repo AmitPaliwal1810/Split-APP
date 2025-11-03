@@ -7,7 +7,7 @@ import { signOut } from '@services/authService';
 import { HomeNavigator } from './HomeNavigator';
 import { ProfileScreen } from '@screens/profile/ProfileScreen';
 import { Ionicons } from '@expo/vector-icons';
-import { MainDrawerParamList } from '@types/index';
+import type { MainDrawerParamList } from '../types';
 
 const Drawer = createDrawerNavigator<MainDrawerParamList>();
 

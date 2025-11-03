@@ -32,20 +32,18 @@ export const HomeScreen: React.FC = () => {
   useEffect(() => {
     if (!user) return;
 
-    const q = query(
-      collection(db, 'groups'),
-      where('members', 'array-contains', { userId: user.id })
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const groupsData = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Group[];
-      setGroups(groupsData);
-      setLoading(false);
-      setRefreshing(false);
-    });
+    const unsubscribe = firestore()
+      .collection('groups')
+      .where('members', 'array-contains', { userId: user.id })
+      .onSnapshot((snapshot) => {
+        const groupsData = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        })) as Group[];
+        setGroups(groupsData);
+        setLoading(false);
+        setRefreshing(false);
+      });
 
     return () => unsubscribe();
   }, [user]);

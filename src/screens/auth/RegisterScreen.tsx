@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   StyleSheet,
   KeyboardAvoidingView,
@@ -13,44 +12,59 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { RootStackParamList } from '@types/index';
+import { useForm } from 'react-hook-form';
+import type { RootStackParamList } from '../../types';
 import { useTheme } from '@contexts/ThemeContext';
 import { useAuth } from '@contexts/AuthContext';
 import { signUpWithEmail, signInWithGoogle } from '@services/authService';
 import { Ionicons } from '@expo/vector-icons';
+import { FormInput } from '@components/common/FormInput';
 
 type RegisterScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Register'>;
+
+interface RegisterFormData {
+  displayName: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
+}
 
 export const RegisterScreen: React.FC = () => {
   const navigation = useNavigation<RegisterScreenNavigationProp>();
   const { colors } = useTheme();
   const { setUser } = useAuth();
-  const [displayName, setDisplayName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const handleRegister = async () => {
-    if (!displayName || !email || !password || !confirmPassword) {
-      Alert.alert('Error', 'Please fill in all fields');
-      return;
-    }
+  const {
+    control,
+    handleSubmit,
+    watch,
+    formState: { errors },
+  } = useForm<RegisterFormData>({
+    defaultValues: {
+      displayName: '',
+      email: '',
+      password: '',
+      confirmPassword: '',
+    },
+  });
 
-    if (password !== confirmPassword) {
+  const password = watch('password');
+
+  const handleRegister = async (data: RegisterFormData) => {
+    if (data.password !== data.confirmPassword) {
       Alert.alert('Error', 'Passwords do not match');
       return;
     }
 
-    if (password.length < 6) {
+    if (data.password.length < 6) {
       Alert.alert('Error', 'Password must be at least 6 characters');
       return;
     }
 
     setLoading(true);
     try {
-      const user = await signUpWithEmail(email, password, displayName);
+      const user = await signUpWithEmail(data.email, data.password, data.displayName);
       setUser(user);
       navigation.navigate('Main');
     } catch (error: any) {
@@ -92,94 +106,52 @@ export const RegisterScreen: React.FC = () => {
           </Text>
         </View>
 
-        <View style={styles.form}>
-          <View style={styles.inputContainer}>
-            <Ionicons
-              name="person-outline"
-              size={20}
-              color={colors.textSecondary}
-              style={styles.inputIcon}
-            />
-            <TextInput
-              style={[styles.input, { color: colors.text, borderColor: colors.border }]}
+          <View style={styles.form}>
+            <FormInput
+              name="displayName"
+              control={control}
               placeholder="Full Name"
-              placeholderTextColor={colors.textSecondary}
-              value={displayName}
-              onChangeText={setDisplayName}
+              icon="person-outline"
               autoComplete="name"
+              error={errors.displayName}
             />
-          </View>
 
-          <View style={styles.inputContainer}>
-            <Ionicons
-              name="mail-outline"
-              size={20}
-              color={colors.textSecondary}
-              style={styles.inputIcon}
-            />
-            <TextInput
-              style={[styles.input, { color: colors.text, borderColor: colors.border }]}
+            <FormInput
+              name="email"
+              control={control}
               placeholder="Email"
-              placeholderTextColor={colors.textSecondary}
-              value={email}
-              onChangeText={setEmail}
+              icon="mail-outline"
               keyboardType="email-address"
               autoCapitalize="none"
               autoComplete="email"
+              error={errors.email}
             />
-          </View>
 
-          <View style={styles.inputContainer}>
-            <Ionicons
-              name="lock-closed-outline"
-              size={20}
-              color={colors.textSecondary}
-              style={styles.inputIcon}
-            />
-            <TextInput
-              style={[styles.input, { color: colors.text, borderColor: colors.border }]}
+            <FormInput
+              name="password"
+              control={control}
               placeholder="Password"
-              placeholderTextColor={colors.textSecondary}
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry={!showPassword}
+              icon="lock-closed-outline"
+              isPassword
               autoComplete="password"
+              error={errors.password}
             />
-            <TouchableOpacity
-              onPress={() => setShowPassword(!showPassword)}
-              style={styles.eyeIcon}
-            >
-              <Ionicons
-                name={showPassword ? 'eye-outline' : 'eye-off-outline'}
-                size={20}
-                color={colors.textSecondary}
-              />
-            </TouchableOpacity>
-          </View>
 
-          <View style={styles.inputContainer}>
-            <Ionicons
-              name="lock-closed-outline"
-              size={20}
-              color={colors.textSecondary}
-              style={styles.inputIcon}
-            />
-            <TextInput
-              style={[styles.input, { color: colors.text, borderColor: colors.border }]}
+            <FormInput
+              name="confirmPassword"
+              control={control}
               placeholder="Confirm Password"
-              placeholderTextColor={colors.textSecondary}
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              secureTextEntry={!showPassword}
+              icon="lock-closed-outline"
+              isPassword
               autoComplete="password"
+              error={errors.confirmPassword}
             />
-          </View>
 
-          <TouchableOpacity
-            style={[styles.registerButton, { backgroundColor: colors.primary }]}
-            onPress={handleRegister}
-            disabled={loading}
-          >
+            <TouchableOpacity
+              style={[styles.registerButton, { backgroundColor: colors.primary }]}
+              onPress={handleSubmit(handleRegister)}
+              disabled={loading}
+            >
             {loading ? (
               <ActivityIndicator color="#fff" />
             ) : (
@@ -251,30 +223,6 @@ const styles = StyleSheet.create({
   },
   form: {
     width: '100%',
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-    position: 'relative',
-  },
-  inputIcon: {
-    position: 'absolute',
-    left: 16,
-    zIndex: 1,
-  },
-  input: {
-    flex: 1,
-    height: 56,
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 48,
-    fontSize: 16,
-  },
-  eyeIcon: {
-    position: 'absolute',
-    right: 16,
-    padding: 8,
   },
   registerButton: {
     height: 56,

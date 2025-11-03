@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   StyleSheet,
   ScrollView,
@@ -10,13 +9,20 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
-import { doc, getDoc } from 'firebase/firestore';
-import { ref, push, set } from 'firebase/database';
-import { db, realtimeDb } from '@services/firebase';
+import { useForm } from 'react-hook-form';
+import firestore from '@react-native-firebase/firestore';
+import database from '@react-native-firebase/database';
 import { useAuth } from '@contexts/AuthContext';
 import { useTheme } from '@contexts/ThemeContext';
 import { Group, ExpenseSplit } from '@types/index';
 import { Ionicons } from '@expo/vector-icons';
+import { FormInput } from '@components/common/FormInput';
+
+interface AddExpenseFormData {
+  title: string;
+  amount: string;
+  description: string;
+}
 
 export const AddExpenseScreen: React.FC = () => {
   const route = useRoute();
@@ -25,11 +31,20 @@ export const AddExpenseScreen: React.FC = () => {
   const { colors } = useTheme();
   const { groupId } = route.params as { groupId: string };
   const [group, setGroup] = useState<Group | null>(null);
-  const [title, setTitle] = useState('');
-  const [amount, setAmount] = useState('');
-  const [description, setDescription] = useState('');
   const [splitType, setSplitType] = useState<'equal' | 'custom' | 'individual'>('equal');
   const [loading, setLoading] = useState(false);
+
+  const {
+    control,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<AddExpenseFormData>({
+    defaultValues: {
+      title: '',
+      amount: '',
+      description: '',
+    },
+  });
 
   useEffect(() => {
     loadGroup();
@@ -37,8 +52,8 @@ export const AddExpenseScreen: React.FC = () => {
 
   const loadGroup = async () => {
     try {
-      const groupDoc = await getDoc(doc(db, 'groups', groupId));
-      if (groupDoc.exists()) {
+      const groupDoc = await firestore().collection('groups').doc(groupId).get();
+      if (groupDoc.exists) {
         setGroup({ id: groupDoc.id, ...groupDoc.data() } as Group);
       }
     } catch (error: any) {
@@ -46,13 +61,13 @@ export const AddExpenseScreen: React.FC = () => {
     }
   };
 
-  const handleAddExpense = async () => {
-    if (!title.trim() || !amount || !group || !user) {
+  const handleAddExpense = async (data: AddExpenseFormData) => {
+    if (!group || !user) {
       Alert.alert('Error', 'Please fill in all required fields');
       return;
     }
 
-    const numAmount = parseFloat(amount);
+    const numAmount = parseFloat(data.amount);
     if (isNaN(numAmount) || numAmount <= 0) {
       Alert.alert('Error', 'Please enter a valid amount');
       return;
@@ -72,19 +87,19 @@ export const AddExpenseScreen: React.FC = () => {
       }
 
       // Add expense to Realtime Database for instant updates
-      const expenseRef = push(ref(realtimeDb, `expenses/${groupId}`));
+      const expenseRef = database().ref(`expenses/${groupId}`).push();
       const expenseData = {
-        title: title.trim(),
+        title: data.title.trim(),
         amount: numAmount,
         paidBy: user.id,
         splitType,
         splits,
-        description: description.trim(),
+        description: data.description.trim(),
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
 
-      await set(expenseRef, expenseData);
+      await expenseRef.set(expenseData);
 
       Alert.alert('Success', 'Expense added successfully!');
       navigation.goBack();
@@ -102,24 +117,22 @@ export const AddExpenseScreen: React.FC = () => {
           <Ionicons name="receipt" size={60} color={colors.secondary} />
         </View>
 
-        <Text style={[styles.label, { color: colors.text }]}>Expense Title *</Text>
-        <TextInput
-          style={[styles.input, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
-          placeholder="e.g., Dinner, Gas, Movie tickets"
-          placeholderTextColor={colors.textSecondary}
-          value={title}
-          onChangeText={setTitle}
-        />
+          <Text style={[styles.label, { color: colors.text }]}>Expense Title *</Text>
+          <FormInput
+            name="title"
+            control={control}
+            placeholder="e.g., Dinner, Gas, Movie tickets"
+            error={errors.title}
+          />
 
-        <Text style={[styles.label, { color: colors.text }]}>Amount *</Text>
-        <TextInput
-          style={[styles.input, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
-          placeholder="0.00"
-          placeholderTextColor={colors.textSecondary}
-          value={amount}
-          onChangeText={setAmount}
-          keyboardType="decimal-pad"
-        />
+          <Text style={[styles.label, { color: colors.text }]}>Amount *</Text>
+          <FormInput
+            name="amount"
+            control={control}
+            placeholder="0.00"
+            keyboardType="decimal-pad"
+            error={errors.amount}
+          />
 
         <Text style={[styles.label, { color: colors.text }]}>Split Type</Text>
         <View style={styles.splitTypeContainer}>
@@ -170,22 +183,21 @@ export const AddExpenseScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
 
-        <Text style={[styles.label, { color: colors.text }]}>Description (Optional)</Text>
-        <TextInput
-          style={[styles.textArea, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
-          placeholder="Add details about this expense"
-          placeholderTextColor={colors.textSecondary}
-          value={description}
-          onChangeText={setDescription}
-          multiline
-          numberOfLines={4}
-        />
+          <Text style={[styles.label, { color: colors.text }]}>Description (Optional)</Text>
+          <FormInput
+            name="description"
+            control={control}
+            placeholder="Add details about this expense"
+            multiline
+            numberOfLines={4}
+            error={errors.description}
+          />
 
-        <TouchableOpacity
-          style={[styles.button, { backgroundColor: colors.primary }]}
-          onPress={handleAddExpense}
-          disabled={loading}
-        >
+          <TouchableOpacity
+            style={[styles.button, { backgroundColor: colors.primary }]}
+            onPress={handleSubmit(handleAddExpense)}
+            disabled={loading}
+          >
           {loading ? (
             <ActivityIndicator color="#fff" />
           ) : (
@@ -218,14 +230,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 8,
   },
-  input: {
-    height: 56,
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    fontSize: 16,
-    marginBottom: 20,
-  },
   splitTypeContainer: {
     flexDirection: 'row',
     gap: 12,
@@ -241,16 +245,6 @@ const styles = StyleSheet.create({
   splitTypeText: {
     fontSize: 14,
     fontWeight: '600',
-  },
-  textArea: {
-    height: 120,
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    marginBottom: 32,
-    textAlignVertical: 'top',
   },
   button: {
     height: 56,

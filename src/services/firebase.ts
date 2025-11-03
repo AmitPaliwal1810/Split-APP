@@ -1,47 +1,22 @@
-import { initializeApp, getApps } from 'firebase/app';
-import { getAuth, initializeAuth, getReactNativePersistence } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
-import { getStorage } from 'firebase/storage';
-import { getDatabase } from 'firebase/database';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { FIREBASE_CONFIG } from '@constants/config';
+import auth from '@react-native-firebase/auth';
+import firestore from '@react-native-firebase/firestore';
+import storage from '@react-native-firebase/storage';
+import database from '@react-native-firebase/database';
 
-// Initialize Firebase with error handling
-let app;
-let auth;
-let db;
-let storage;
-let realtimeDb;
+// React Native Firebase is automatically initialized with google-services.json (Android)
+// and GoogleService-Info.plist (iOS) configuration files
 
-try {
-  if (getApps().length === 0) {
-    app = initializeApp(FIREBASE_CONFIG);
-  } else {
-    app = getApps()[0];
-  }
+// Export Firebase services
+export { auth, firestore as db, storage, database as realtimeDb };
 
-  // Initialize Auth with AsyncStorage persistence
-  try {
-    auth = initializeAuth(app, {
-      persistence: getReactNativePersistence(AsyncStorage),
-    });
-  } catch (error: any) {
-    // If initializeAuth fails, try getAuth (might already be initialized)
-    console.warn('Auth initialization warning:', error.message);
-    auth = getAuth(app);
-  }
+// Auth instance
+export const getAuth = () => auth();
 
-  // Initialize Firestore
-  db = getFirestore(app);
+// Firestore instance
+export const getFirestore = () => firestore();
 
-  // Initialize Storage
-  storage = getStorage(app);
+// Storage instance
+export const getStorage = () => storage();
 
-  // Initialize Realtime Database
-  realtimeDb = getDatabase(app);
-} catch (error) {
-  console.warn('Firebase initialization failed. Using test mode.', error);
-}
-
-export { auth, db, storage, realtimeDb };
-export default app;
+// Realtime Database instance
+export const getDatabase = () => database();

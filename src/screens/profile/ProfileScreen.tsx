@@ -1,31 +1,57 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   Image,
   TouchableOpacity,
-  TextInput,
   StyleSheet,
   ScrollView,
   Alert,
   ActivityIndicator,
 } from 'react-native';
+import { useForm } from 'react-hook-form';
 import * as ImagePicker from 'expo-image-picker';
-import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { storage } from '@services/firebase';
+import storage from '@react-native-firebase/storage';
 import { updateUserProfile } from '@services/authService';
 import { useAuth } from '@contexts/AuthContext';
 import { useTheme } from '@contexts/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
+import { FormInput } from '@components/common/FormInput';
+
+interface ProfileFormData {
+  displayName: string;
+  phoneNumber: string;
+  dateOfBirth: string;
+}
 
 export const ProfileScreen: React.FC = () => {
   const { user, setUser } = useAuth();
   const { colors } = useTheme();
   const [editing, setEditing] = useState(false);
-  const [displayName, setDisplayName] = useState(user?.displayName || '');
-  const [phoneNumber, setPhoneNumber] = useState(user?.phoneNumber || '');
-  const [dateOfBirth, setDateOfBirth] = useState(user?.dateOfBirth || '');
   const [loading, setLoading] = useState(false);
+
+  const {
+    control,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<ProfileFormData>({
+    defaultValues: {
+      displayName: user?.displayName || '',
+      phoneNumber: user?.phoneNumber || '',
+      dateOfBirth: user?.dateOfBirth || '',
+    },
+  });
+
+  useEffect(() => {
+    if (user) {
+      reset({
+        displayName: user.displayName || '',
+        phoneNumber: user.phoneNumber || '',
+        dateOfBirth: user.dateOfBirth || '',
+      });
+    }
+  }, [user, reset]);
 
   const handlePickImage = async () => {
     try {
@@ -48,11 +74,9 @@ export const ProfileScreen: React.FC = () => {
         const imageUri = result.assets[0].uri;
 
         // Upload to Firebase Storage
-        const response = await fetch(imageUri);
-        const blob = await response.blob();
-        const imageRef = storageRef(storage, `profile_images/${user.id}`);
-        await uploadBytes(imageRef, blob);
-        const photoURL = await getDownloadURL(imageRef);
+        const reference = storage().ref(`profile_images/${user.id}`);
+        await reference.putFile(imageUri);
+        const photoURL = await reference.getDownloadURL();
 
         // Update user profile
         await updateUserProfile(user.id, { photoURL });
@@ -67,22 +91,22 @@ export const ProfileScreen: React.FC = () => {
     }
   };
 
-  const handleSave = async () => {
+  const handleSave = async (data: ProfileFormData) => {
     if (!user) return;
 
     setLoading(true);
     try {
       await updateUserProfile(user.id, {
-        displayName,
-        phoneNumber,
-        dateOfBirth,
+        displayName: data.displayName,
+        phoneNumber: data.phoneNumber,
+        dateOfBirth: data.dateOfBirth,
       });
 
       setUser({
         ...user,
-        displayName,
-        phoneNumber,
-        dateOfBirth,
+        displayName: data.displayName,
+        phoneNumber: data.phoneNumber,
+        dateOfBirth: data.dateOfBirth,
       });
 
       setEditing(false);
@@ -92,6 +116,15 @@ export const ProfileScreen: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCancel = () => {
+    setEditing(false);
+    reset({
+      displayName: user?.displayName || '',
+      phoneNumber: user?.phoneNumber || '',
+      dateOfBirth: user?.dateOfBirth || '',
+    });
   };
 
   return (
@@ -125,87 +158,94 @@ export const ProfileScreen: React.FC = () => {
           </Text>
         </View>
 
-        <View style={[styles.infoCard, { backgroundColor: colors.card }]}>
-          <View style={styles.infoRow}>
-            <Ionicons name="person-outline" size={24} color={colors.textSecondary} />
+          <View style={[styles.infoCard, { backgroundColor: colors.card }]}>
             {editing ? (
-              <TextInput
-                style={[styles.input, { color: colors.text, borderColor: colors.border }]}
-                value={displayName}
-                onChangeText={setDisplayName}
-                placeholder="Display Name"
-                placeholderTextColor={colors.textSecondary}
-              />
-            ) : (
-              <View style={styles.infoTextContainer}>
-                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Name</Text>
-                <Text style={[styles.infoValue, { color: colors.text }]}>
-                  {displayName || 'Not set'}
-                </Text>
-              </View>
-            )}
-          </View>
+              <>
+                <View style={[styles.formRow, { borderBottomColor: colors.border }]}>
+                  <Ionicons name="person-outline" size={24} color={colors.textSecondary} />
+                  <View style={styles.formInputWrapper}>
+                    <FormInput
+                      name="displayName"
+                      control={control}
+                      placeholder="Display Name"
+                      error={errors.displayName}
+                    />
+                  </View>
+                </View>
 
-          <View style={styles.infoRow}>
-            <Ionicons name="call-outline" size={24} color={colors.textSecondary} />
-            {editing ? (
-              <TextInput
-                style={[styles.input, { color: colors.text, borderColor: colors.border }]}
-                value={phoneNumber}
-                onChangeText={setPhoneNumber}
-                placeholder="Phone Number"
-                placeholderTextColor={colors.textSecondary}
-                keyboardType="phone-pad"
-              />
-            ) : (
-              <View style={styles.infoTextContainer}>
-                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Phone</Text>
-                <Text style={[styles.infoValue, { color: colors.text }]}>
-                  {phoneNumber || 'Not set'}
-                </Text>
-              </View>
-            )}
-          </View>
+                <View style={[styles.formRow, { borderBottomColor: colors.border }]}>
+                  <Ionicons name="call-outline" size={24} color={colors.textSecondary} />
+                  <View style={styles.formInputWrapper}>
+                    <FormInput
+                      name="phoneNumber"
+                      control={control}
+                      placeholder="Phone Number"
+                      keyboardType="phone-pad"
+                      error={errors.phoneNumber}
+                    />
+                  </View>
+                </View>
 
-          <View style={styles.infoRow}>
-            <Ionicons name="calendar-outline" size={24} color={colors.textSecondary} />
-            {editing ? (
-              <TextInput
-                style={[styles.input, { color: colors.text, borderColor: colors.border }]}
-                value={dateOfBirth}
-                onChangeText={setDateOfBirth}
-                placeholder="Date of Birth (YYYY-MM-DD)"
-                placeholderTextColor={colors.textSecondary}
-              />
+                <View style={[styles.formRow, { borderBottomColor: colors.border }]}>
+                  <Ionicons name="calendar-outline" size={24} color={colors.textSecondary} />
+                  <View style={styles.formInputWrapper}>
+                    <FormInput
+                      name="dateOfBirth"
+                      control={control}
+                      placeholder="Date of Birth (YYYY-MM-DD)"
+                      error={errors.dateOfBirth}
+                    />
+                  </View>
+                </View>
+              </>
             ) : (
-              <View style={styles.infoTextContainer}>
-                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Date of Birth</Text>
-                <Text style={[styles.infoValue, { color: colors.text }]}>
-                  {dateOfBirth || 'Not set'}
-                </Text>
-              </View>
+              <>
+                <View style={[styles.infoRow, { borderBottomColor: colors.border }]}>
+                  <Ionicons name="person-outline" size={24} color={colors.textSecondary} />
+                  <View style={styles.infoTextContainer}>
+                    <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Name</Text>
+                    <Text style={[styles.infoValue, { color: colors.text }]}>
+                      {user?.displayName || 'Not set'}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={[styles.infoRow, { borderBottomColor: colors.border }]}>
+                  <Ionicons name="call-outline" size={24} color={colors.textSecondary} />
+                  <View style={styles.infoTextContainer}>
+                    <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Phone</Text>
+                    <Text style={[styles.infoValue, { color: colors.text }]}>
+                      {user?.phoneNumber || 'Not set'}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={[styles.infoRow, { borderBottomColor: colors.border }]}>
+                  <Ionicons name="calendar-outline" size={24} color={colors.textSecondary} />
+                  <View style={styles.infoTextContainer}>
+                    <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Date of Birth</Text>
+                    <Text style={[styles.infoValue, { color: colors.text }]}>
+                      {user?.dateOfBirth || 'Not set'}
+                    </Text>
+                  </View>
+                </View>
+              </>
             )}
           </View>
-        </View>
 
         {editing ? (
           <View style={styles.buttonRow}>
-            <TouchableOpacity
-              style={[styles.button, styles.cancelButton, { borderColor: colors.border }]}
-              onPress={() => {
-                setEditing(false);
-                setDisplayName(user?.displayName || '');
-                setPhoneNumber(user?.phoneNumber || '');
-                setDateOfBirth(user?.dateOfBirth || '');
-              }}
-            >
-              <Text style={[styles.cancelButtonText, { color: colors.text }]}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.button, styles.saveButton, { backgroundColor: colors.primary }]}
-              onPress={handleSave}
-              disabled={loading}
-            >
+              <TouchableOpacity
+                style={[styles.button, styles.cancelButton, { borderColor: colors.border }]}
+                onPress={handleCancel}
+              >
+                <Text style={[styles.cancelButtonText, { color: colors.text }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.button, styles.saveButton, { backgroundColor: colors.primary }]}
+                onPress={handleSubmit(handleSave)}
+                disabled={loading}
+              >
               {loading ? (
                 <ActivityIndicator color="#fff" />
               ) : (
@@ -301,14 +341,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  input: {
+  formRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+  },
+  formInputWrapper: {
     flex: 1,
     marginLeft: 16,
-    height: 40,
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    fontSize: 16,
   },
   buttonRow: {
     flexDirection: 'row',

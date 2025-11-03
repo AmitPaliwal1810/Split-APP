@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   StyleSheet,
   KeyboardAvoidingView,
@@ -13,32 +12,43 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { RootStackParamList } from '@types/index';
+import { useForm } from 'react-hook-form';
+import type { RootStackParamList } from '../../types';
 import { useTheme } from '@contexts/ThemeContext';
 import { useAuth } from '@contexts/AuthContext';
 import { signInWithEmail, signInWithGoogle, resetPassword } from '@services/authService';
 import { Ionicons } from '@expo/vector-icons';
+import { FormInput } from '@components/common/FormInput';
 
 type LoginScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Login'>;
+
+interface LoginFormData {
+  email: string;
+  password: string;
+}
 
 export const LoginScreen: React.FC = () => {
   const navigation = useNavigation<LoginScreenNavigationProp>();
   const { colors } = useTheme();
   const { setUser } = useAuth();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert('Error', 'Please fill in all fields');
-      return;
-    }
+  const {
+    control,
+    handleSubmit,
+    getValues,
+    formState: { errors },
+  } = useForm<LoginFormData>({
+    defaultValues: {
+      email: '',
+      password: '',
+    },
+  });
 
+  const handleLogin = async (data: LoginFormData) => {
     setLoading(true);
     try {
-      const user = await signInWithEmail(email, password);
+      const user = await signInWithEmail(data.email, data.password);
       setUser(user);
       navigation.navigate('Main');
     } catch (error: any) {
@@ -62,6 +72,7 @@ export const LoginScreen: React.FC = () => {
   };
 
   const handleForgotPassword = async () => {
+    const email = getValues('email');
     if (!email) {
       Alert.alert('Email Required', 'Please enter your email address to reset your password.');
       return;
@@ -115,61 +126,35 @@ export const LoginScreen: React.FC = () => {
           </Text>
         </View>
 
-        <View style={styles.form}>
-          {/* Test Credentials Hint */}
-          <View style={[styles.testHintContainer, { backgroundColor: colors.primary + '15', borderColor: colors.primary + '40' }]}>
-            <Ionicons name="information-circle" size={16} color={colors.primary} />
-            <Text style={[styles.testHintText, { color: colors.primary }]}>
-              Test Mode: Use test@example.com / test123
-            </Text>
-          </View>
+          <View style={styles.form}>
+            {/* Test Credentials Hint */}
+            <View style={[styles.testHintContainer, { backgroundColor: colors.primary + '15', borderColor: colors.primary + '40' }]}>
+              <Ionicons name="information-circle" size={16} color={colors.primary} />
+              <Text style={[styles.testHintText, { color: colors.primary }]}>
+                Test Mode: Use test@example.com / test123
+              </Text>
+            </View>
 
-          <View style={styles.inputContainer}>
-            <Ionicons
-              name="mail-outline"
-              size={20}
-              color={colors.textSecondary}
-              style={styles.inputIcon}
-            />
-            <TextInput
-              style={[styles.input, { color: colors.text, borderColor: colors.border }]}
+            <FormInput
+              name="email"
+              control={control}
               placeholder="Email"
-              placeholderTextColor={colors.textSecondary}
-              value={email}
-              onChangeText={setEmail}
+              icon="mail-outline"
               keyboardType="email-address"
               autoCapitalize="none"
               autoComplete="email"
+              error={errors.email}
             />
-          </View>
 
-          <View style={styles.inputContainer}>
-            <Ionicons
-              name="lock-closed-outline"
-              size={20}
-              color={colors.textSecondary}
-              style={styles.inputIcon}
-            />
-            <TextInput
-              style={[styles.input, { color: colors.text, borderColor: colors.border }]}
+            <FormInput
+              name="password"
+              control={control}
               placeholder="Password"
-              placeholderTextColor={colors.textSecondary}
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry={!showPassword}
+              icon="lock-closed-outline"
+              isPassword
               autoComplete="password"
+              error={errors.password}
             />
-            <TouchableOpacity
-              onPress={() => setShowPassword(!showPassword)}
-              style={styles.eyeIcon}
-            >
-              <Ionicons
-                name={showPassword ? 'eye-outline' : 'eye-off-outline'}
-                size={20}
-                color={colors.textSecondary}
-              />
-            </TouchableOpacity>
-          </View>
 
           <TouchableOpacity
             style={styles.forgotPasswordContainer}
@@ -180,17 +165,17 @@ export const LoginScreen: React.FC = () => {
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.loginButton, { backgroundColor: colors.primary }]}
-            onPress={handleLogin}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.loginButtonText}>Sign In</Text>
-            )}
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.loginButton, { backgroundColor: colors.primary }]}
+              onPress={handleSubmit(handleLogin)}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.loginButtonText}>Sign In</Text>
+              )}
+            </TouchableOpacity>
 
           <View style={styles.dividerContainer}>
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
@@ -269,30 +254,6 @@ const styles = StyleSheet.create({
   testHintText: {
     fontSize: 13,
     fontWeight: '600',
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-    position: 'relative',
-  },
-  inputIcon: {
-    position: 'absolute',
-    left: 16,
-    zIndex: 1,
-  },
-  input: {
-    flex: 1,
-    height: 56,
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 48,
-    fontSize: 16,
-  },
-  eyeIcon: {
-    position: 'absolute',
-    right: 16,
-    padding: 8,
   },
   forgotPasswordContainer: {
     alignItems: 'flex-end',
