@@ -1,8 +1,14 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { auth } from '@services/firebase';
 import { getUserData } from '@services/authService';
 import { User } from '@types/index';
+
+// Conditionally import Firebase auth (won't work in Expo Go)
+let auth: any = null;
+try {
+  auth = require('@react-native-firebase/auth').default;
+} catch (error) {
+  console.warn('⚠️ Firebase Auth not available in AuthContext (Expo Go mode)');
+}
 
 interface AuthContextType {
   user: User | null;
@@ -17,7 +23,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
+    // If Firebase auth is not available (Expo Go mode), just set loading to false
+    if (!auth) {
+      setLoading(false);
+      return;
+    }
+
+    // Set up auth state listener for React Native Firebase
+    const unsubscribe = auth().onAuthStateChanged(async (firebaseUser: any) => {
       if (firebaseUser) {
         try {
           const userData = await getUserData(firebaseUser.uid);

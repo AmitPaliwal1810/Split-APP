@@ -11,12 +11,19 @@ import {
 } from 'react-native';
 import { useForm } from 'react-hook-form';
 import * as ImagePicker from 'expo-image-picker';
-import storage from '@react-native-firebase/storage';
 import { updateUserProfile } from '@services/authService';
 import { useAuth } from '@contexts/AuthContext';
 import { useTheme } from '@contexts/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { FormInput } from '@components/common/FormInput';
+
+// Conditionally import Firebase Storage (won't work in Expo Go)
+let storage: any = null;
+try {
+  storage = require('@react-native-firebase/storage').default;
+} catch (error) {
+  console.warn('⚠️ Firebase Storage not available (Expo Go mode)');
+}
 
 interface ProfileFormData {
   displayName: string;
@@ -54,6 +61,15 @@ export const ProfileScreen: React.FC = () => {
   }, [user, reset]);
 
   const handlePickImage = async () => {
+    // Check if Firebase Storage is available
+    if (!storage) {
+      Alert.alert(
+        'Feature Not Available',
+        'Profile picture upload is not available in Expo Go.\n\nFor full features, run:\nnpx expo prebuild && npx expo run:android'
+      );
+      return;
+    }
+
     try {
       const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
 

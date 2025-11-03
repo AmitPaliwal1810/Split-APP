@@ -1,20 +1,31 @@
-import Constants from 'expo-constants';
+import {
+  FIREBASE_API_KEY,
+  FIREBASE_AUTH_DOMAIN,
+  FIREBASE_PROJECT_ID,
+  FIREBASE_STORAGE_BUCKET,
+  FIREBASE_MESSAGING_SENDER_ID,
+  FIREBASE_APP_ID,
+  FIREBASE_DATABASE_URL,
+  GOOGLE_WEB_CLIENT_ID as GOOGLE_CLIENT_ID,
+  APP_STORE_LINK,
+  APP_DOWNLOAD_MESSAGE,
+} from '@env';
 
-// DUMMY Firebase configuration for testing (replace with real config when ready)
+// Firebase configuration from environment variables
 export const FIREBASE_CONFIG = {
-  apiKey: Constants.expoConfig?.extra?.FIREBASE_API_KEY || process.env.FIREBASE_API_KEY || 'AIzaSyDummyKeyForTestingPurposesOnly123456',
-  authDomain: Constants.expoConfig?.extra?.FIREBASE_AUTH_DOMAIN || process.env.FIREBASE_AUTH_DOMAIN || 'split-bills-test.firebaseapp.com',
-  projectId: Constants.expoConfig?.extra?.FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID || 'split-bills-test',
-  storageBucket: Constants.expoConfig?.extra?.FIREBASE_STORAGE_BUCKET || process.env.FIREBASE_STORAGE_BUCKET || 'split-bills-test.appspot.com',
-  messagingSenderId: Constants.expoConfig?.extra?.FIREBASE_MESSAGING_SENDER_ID || process.env.FIREBASE_MESSAGING_SENDER_ID || '123456789012',
-  appId: Constants.expoConfig?.extra?.FIREBASE_APP_ID || process.env.FIREBASE_APP_ID || '1:123456789012:ios:abcdef1234567890',
-  databaseURL: Constants.expoConfig?.extra?.FIREBASE_DATABASE_URL || process.env.FIREBASE_DATABASE_URL || 'https://split-bills-test-default-rtdb.firebaseio.com',
+  apiKey: FIREBASE_API_KEY || 'AIzaSyDummyKeyForTestingPurposesOnly123456',
+  authDomain: FIREBASE_AUTH_DOMAIN || 'split-bills-test.firebaseapp.com',
+  projectId: FIREBASE_PROJECT_ID || 'split-bills-test',
+  storageBucket: FIREBASE_STORAGE_BUCKET || 'split-bills-test.appspot.com',
+  messagingSenderId: FIREBASE_MESSAGING_SENDER_ID || '123456789012',
+  appId: FIREBASE_APP_ID || '1:123456789012:ios:abcdef1234567890',
+  databaseURL: FIREBASE_DATABASE_URL || 'https://split-bills-test-default-rtdb.firebaseio.com',
 };
 
-export const GOOGLE_WEB_CLIENT_ID = Constants.expoConfig?.extra?.GOOGLE_WEB_CLIENT_ID || process.env.GOOGLE_WEB_CLIENT_ID || 'dummy-google-client-id.apps.googleusercontent.com';
+export const GOOGLE_WEB_CLIENT_ID = GOOGLE_CLIENT_ID || 'dummy-google-client-id.apps.googleusercontent.com';
 
 export const APP_CONFIG = {
-  storeLink: Constants.expoConfig?.extra?.APP_STORE_LINK || process.env.APP_STORE_LINK || 'https://play.google.com/store',
-  downloadMessage: Constants.expoConfig?.extra?.APP_DOWNLOAD_MESSAGE || process.env.APP_DOWNLOAD_MESSAGE ||
+  storeLink: APP_STORE_LINK || 'https://play.google.com/store',
+  downloadMessage: APP_DOWNLOAD_MESSAGE ||
     "Hey! I'm using SplitBills to manage group expenses. Join me! Download the app here:",
 };

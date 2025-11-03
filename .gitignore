@@ -9,12 +9,19 @@ npm-debug.*
 *.mobileprovision
 *.orig.*
 web-build/
+
+# Environment variables
 .env
 .env.local
+.env.*.local
 
 # macOS
 .DS_Store
 
-# Firebase
-google-services.json
-GoogleService-Info.plist
+# Firebase (optional - you can keep these if you want to commit them)
+# google-services.json
+# GoogleService-Info.plist
+
+# Build folders
+android/
+ios/

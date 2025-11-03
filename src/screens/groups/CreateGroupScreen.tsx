@@ -11,11 +11,18 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useForm } from 'react-hook-form';
-import firestore from '@react-native-firebase/firestore';
 import { useAuth } from '@contexts/AuthContext';
 import { useTheme } from '@contexts/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { FormInput } from '@components/common/FormInput';
+
+// Conditionally import Firebase Firestore (won't work in Expo Go)
+let firestore: any = null;
+try {
+  firestore = require('@react-native-firebase/firestore').default;
+} catch (error) {
+  console.warn('⚠️ Firebase Firestore not available (Expo Go mode)');
+}
 
 interface CreateGroupFormData {
   groupName: string;
@@ -41,6 +48,15 @@ export const CreateGroupScreen: React.FC = () => {
 
   const handleCreateGroup = async (data: CreateGroupFormData) => {
     if (!user) return;
+
+    // Check if Firebase is available
+    if (!firestore) {
+      Alert.alert(
+        'Feature Not Available',
+        'Creating groups is not available in Expo Go.\n\nFor full features, run:\nnpx expo prebuild && npx expo run:android'
+      );
+      return;
+    }
 
     setLoading(true);
     try {

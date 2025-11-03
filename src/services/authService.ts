@@ -1,16 +1,25 @@
-import auth from '@react-native-firebase/auth';
-import firestore from '@react-native-firebase/firestore';
-import { GoogleSignin } from '@react-native-google-signin/google-signin';
-import { User } from '@types/index';
+import { User } from '../types';
 import { GOOGLE_WEB_CLIENT_ID } from '@constants/config';
 
-// Configure Google Sign-In
+// Conditionally import Firebase modules (won't work in Expo Go)
+let auth: any = null;
+let firestore: any = null;
+let GoogleSignin: any = null;
+
 try {
-  GoogleSignin.configure({
-    webClientId: GOOGLE_WEB_CLIENT_ID,
-  });
+  auth = require('@react-native-firebase/auth').default;
+  firestore = require('@react-native-firebase/firestore').default;
+  GoogleSignin = require('@react-native-google-signin/google-signin').GoogleSignin;
+  
+  // Configure Google Sign-In
+  if (GoogleSignin) {
+    GoogleSignin.configure({
+      webClientId: GOOGLE_WEB_CLIENT_ID,
+    });
+  }
 } catch (error) {
-  console.warn('Google Sign-In configuration error:', error);
+  console.warn('⚠️ Native modules not available (Expo Go mode). Using test credentials only.');
+  console.warn('📱 For full Firebase features, use: npx expo run:android');
 }
 
 export const signUpWithEmail = async (
@@ -18,6 +27,11 @@ export const signUpWithEmail = async (
   password: string,
   displayName: string
 ): Promise<User> => {
+  // Check if Firebase is available
+  if (!auth || !firestore) {
+    throw new Error('Firebase not available in Expo Go. Use npx expo run:android for full features.');
+  }
+
   try {
     const userCredential = await auth().createUserWithEmailAndPassword(email, password);
     const firebaseUser = userCredential.user;
@@ -87,6 +101,11 @@ export const signInWithEmail = async (email: string, password: string): Promise<
 };
 
 export const signInWithGoogle = async (): Promise<User> => {
+  // Check if Google Sign-In is available
+  if (!GoogleSignin || !auth || !firestore) {
+    throw new Error('Google Sign-In not available in Expo Go. Use npx expo run:android for full features.');
+  }
+
   try {
     // Check if device supports Google Play Services
     await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
@@ -132,11 +151,18 @@ export const signInWithGoogle = async (): Promise<User> => {
 };
 
 export const signOut = async (): Promise<void> => {
+  if (!auth) {
+    // Just clear local state in Expo Go mode
+    return;
+  }
+
   try {
     // Sign out from Google if signed in
-    const isSignedIn = await GoogleSignin.isSignedIn();
-    if (isSignedIn) {
-      await GoogleSignin.signOut();
+    if (GoogleSignin) {
+      const isSignedIn = await GoogleSignin.isSignedIn();
+      if (isSignedIn) {
+        await GoogleSignin.signOut();
+      }
     }
     await auth().signOut();
   } catch (error: any) {
@@ -148,6 +174,10 @@ export const updateUserProfile = async (
   userId: string,
   updates: Partial<User>
 ): Promise<void> => {
+  if (!auth || !firestore) {
+    throw new Error('Firebase not available in Expo Go.');
+  }
+
   try {
     const userRef = firestore().collection('users').doc(userId);
     await userRef.update({
@@ -169,6 +199,10 @@ export const updateUserProfile = async (
 };
 
 export const getUserData = async (userId: string): Promise<User | null> => {
+  if (!firestore) {
+    return null;
+  }
+
   try {
     const userDoc = await firestore().collection('users').doc(userId).get();
     if (userDoc.exists) {
@@ -181,6 +215,10 @@ export const getUserData = async (userId: string): Promise<User | null> => {
 };
 
 export const resetPassword = async (email: string): Promise<void> => {
+  if (!auth) {
+    throw new Error('Firebase not available in Expo Go.');
+  }
+
   try {
     await auth().sendPasswordResetEmail(email);
   } catch (error: any) {

@@ -12,11 +12,18 @@ import {
 import { useRoute, useNavigation } from '@react-navigation/native';
 import * as Contacts from 'expo-contacts';
 import * as SMS from 'expo-sms';
-import firestore from '@react-native-firebase/firestore';
 import { useTheme } from '@contexts/ThemeContext';
 import { Contact } from '@types/index';
 import { Ionicons } from '@expo/vector-icons';
 import { APP_CONFIG } from '@constants/config';
+
+// Conditionally import Firebase Firestore (won't work in Expo Go)
+let firestore: any = null;
+try {
+  firestore = require('@react-native-firebase/firestore').default;
+} catch (error) {
+  console.warn('⚠️ Firebase Firestore not available (Expo Go mode)');
+}
 
 export const AddMembersScreen: React.FC = () => {
   const route = useRoute();

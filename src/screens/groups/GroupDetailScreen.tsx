@@ -9,8 +9,6 @@ import {
   Alert,
 } from 'react-native';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
-import firestore from '@react-native-firebase/firestore';
-import database from '@react-native-firebase/database';
 import { useTheme } from '@contexts/ThemeContext';
 import { useAuth } from '@contexts/AuthContext';
 import { Group, Expense } from '@types/index';
@@ -18,6 +16,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { HomeStackParamList } from '@types/index';
 import { APP_CONFIG } from '@constants/config';
 import * as SMS from 'expo-sms';
+
+// Conditionally import Firebase modules (won't work in Expo Go)
+let firestore: any = null;
+let database: any = null;
+try {
+  firestore = require('@react-native-firebase/firestore').default;
+  database = require('@react-native-firebase/database').default;
+} catch (error) {
+  console.warn('⚠️ Firebase not available (Expo Go mode)');
+}
 
 type GroupDetailRouteProp = RouteProp<HomeStackParamList, 'GroupDetail'>;
 

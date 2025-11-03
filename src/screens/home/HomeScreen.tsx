@@ -10,13 +10,19 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { DrawerNavigationProp } from '@react-navigation/drawer';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
-import { db } from '@services/firebase';
 import { useAuth } from '@contexts/AuthContext';
 import { useTheme } from '@contexts/ThemeContext';
 import { Group } from '@types/index';
 import { Ionicons } from '@expo/vector-icons';
 import { HomeStackParamList, MainDrawerParamList } from '@types/index';
+
+// Conditionally import Firebase Firestore (won't work in Expo Go)
+let firestore: any = null;
+try {
+  firestore = require('@react-native-firebase/firestore').default;
+} catch (error) {
+  console.warn('⚠️ Firebase Firestore not available (Expo Go mode)');
+}
 
 type HomeScreenNavigationProp = StackNavigationProp<HomeStackParamList, 'HomeScreen'> &
   DrawerNavigationProp<MainDrawerParamList>;
@@ -31,6 +37,14 @@ export const HomeScreen: React.FC = () => {
 
   useEffect(() => {
     if (!user) return;
+
+    // If Firebase is not available (Expo Go mode), just show empty state
+    if (!firestore) {
+      setGroups([]);
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
 
     const unsubscribe = firestore()
       .collection('groups')
