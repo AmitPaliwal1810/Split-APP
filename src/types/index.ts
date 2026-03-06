@@ -1,3 +1,5 @@
+import { NavigatorScreenParams } from '@react-navigation/native';
+
 export interface User {
   id: string;
   email: string;
@@ -7,6 +9,7 @@ export interface User {
   dateOfBirth?: string;
   createdAt: Date;
   updatedAt: Date;
+  needsProfileSetup?: boolean;
 }
 
 export interface Group {
@@ -60,13 +63,13 @@ export type RootStackParamList = {
   Onboarding: undefined;
   Login: undefined;
   Register: undefined;
-  Main: undefined;
+  Main: NavigatorScreenParams<MainDrawerParamList>;
 };
 
 export type MainDrawerParamList = {
   Home: undefined;
   Groups: undefined;
-  Profile: undefined;
+  Profile: { startEditing?: boolean } | undefined;
   Settings: undefined;
 };
 
@@ -74,7 +77,7 @@ export type HomeStackParamList = {
   HomeScreen: undefined;
   GroupDetail: { groupId: string };
   AddExpense: { groupId: string };
-  ExpenseDetail: { expenseId: string };
+  ExpenseDetail: { expenseId: string; groupId: string };
   CreateGroup: undefined;
   AddMembers: { groupId: string };
 };

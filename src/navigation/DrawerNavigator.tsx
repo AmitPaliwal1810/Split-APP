@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, Image, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { createDrawerNavigator, DrawerContentScrollView, DrawerItemList } from '@react-navigation/drawer';
 import { useTheme } from '@contexts/ThemeContext';
 import { useAuth } from '@contexts/AuthContext';
@@ -13,13 +13,16 @@ const Drawer = createDrawerNavigator<MainDrawerParamList>();
 
 const CustomDrawerContent = (props: any) => {
   const { colors, theme, toggleTheme } = useTheme();
-  const { user } = useAuth();
+  const { user, setUser } = useAuth();
 
   const handleSignOut = async () => {
     try {
       await signOut();
+      setUser(null);
+      props.navigation.closeDrawer();
     } catch (error: any) {
       console.error('Sign out error:', error);
+      Alert.alert('Sign Out Failed', error.message || 'Unable to sign out. Please try again.');
     }
   };
 
@@ -76,9 +79,16 @@ const CustomDrawerContent = (props: any) => {
 
 export const DrawerNavigator: React.FC = () => {
   const { colors } = useTheme();
+  const { user } = useAuth();
+  const initialRoute = user?.needsProfileSetup ? 'Profile' : 'Home';
+  const profileInitialParams = React.useMemo(
+    () => (user?.needsProfileSetup ? { startEditing: true } : undefined),
+    [user?.needsProfileSetup]
+  );
 
   return (
     <Drawer.Navigator
+      initialRouteName={initialRoute}
       drawerContent={(props) => <CustomDrawerContent {...props} />}
       screenOptions={{
         drawerActiveTintColor: colors.primary,
@@ -105,6 +115,7 @@ export const DrawerNavigator: React.FC = () => {
       <Drawer.Screen
         name="Profile"
         component={ProfileScreen}
+        initialParams={profileInitialParams}
         options={{
           drawerIcon: ({ color, size }) => (
             <Ionicons name="person-outline" size={size} color={color} />

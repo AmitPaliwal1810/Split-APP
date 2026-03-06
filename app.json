@@ -30,6 +30,20 @@
     "web": {
       "favicon": "./src/assets/images/favicon.png"
     },
-    "plugins": []
+    "plugins": [
+      "@react-native-firebase/app",
+      "@react-native-firebase/auth",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.939501925847-0a521udb66o1l44h17jrq3np747gc0kj"
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "bcb0d9c6-6c3a-4b3b-900f-191b136a45f4"
+      }
+    }
   }
 }

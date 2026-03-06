@@ -22,7 +22,7 @@ export const FIREBASE_CONFIG = {
   databaseURL: FIREBASE_DATABASE_URL || 'https://split-bills-test-default-rtdb.firebaseio.com',
 };
 
-export const GOOGLE_WEB_CLIENT_ID = GOOGLE_CLIENT_ID || 'dummy-google-client-id.apps.googleusercontent.com';
+export const GOOGLE_WEB_CLIENT_ID = GOOGLE_CLIENT_ID || '939501925847-r2k82p7v7ou96hh76cs8se9o8uq40lph.apps.googleusercontent.com';
 
 export const APP_CONFIG = {
   storeLink: APP_STORE_LINK || 'https://play.google.com/store',

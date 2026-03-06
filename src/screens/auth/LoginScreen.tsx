@@ -15,7 +15,6 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { useForm } from 'react-hook-form';
 import type { RootStackParamList } from '../../types';
 import { useTheme } from '@contexts/ThemeContext';
-import { useAuth } from '@contexts/AuthContext';
 import { signInWithEmail, signInWithGoogle, resetPassword } from '@services/authService';
 import { Ionicons } from '@expo/vector-icons';
 import { FormInput } from '@components/common/FormInput';
@@ -30,7 +29,6 @@ interface LoginFormData {
 export const LoginScreen: React.FC = () => {
   const navigation = useNavigation<LoginScreenNavigationProp>();
   const { colors } = useTheme();
-  const { setUser } = useAuth();
   const [loading, setLoading] = useState(false);
 
   const {
@@ -48,26 +46,26 @@ export const LoginScreen: React.FC = () => {
   const handleLogin = async (data: LoginFormData) => {
     setLoading(true);
     try {
-      const user = await signInWithEmail(data.email, data.password);
-      setUser(user);
-      navigation.navigate('Main');
+      await signInWithEmail(data.email, data.password);
+      console.log('✅ Login successful - Firebase auth listener will handle navigation');
+      // Firebase's onAuthStateChanged listener will automatically handle the rest
     } catch (error: any) {
+      console.error('❌ Login failed:', error.message);
       Alert.alert('Login Failed', error.message);
-    } finally {
-      setLoading(false);
+      setLoading(false); // Only stop loading on error
     }
   };
 
   const handleGoogleSignIn = async () => {
     setLoading(true);
     try {
-      const user = await signInWithGoogle();
-      setUser(user);
-      navigation.navigate('Main');
+      await signInWithGoogle();
+      console.log('✅ Google sign-in successful - Firebase auth listener will handle navigation');
+      // Firebase's onAuthStateChanged listener will automatically handle the rest
     } catch (error: any) {
+      console.error('❌ Google sign-in failed:', error.message);
       Alert.alert('Google Sign-In Failed', error.message);
-    } finally {
-      setLoading(false);
+      setLoading(false); // Only stop loading on error
     }
   };
 

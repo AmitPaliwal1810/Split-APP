@@ -15,7 +15,6 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { useForm } from 'react-hook-form';
 import type { RootStackParamList } from '../../types';
 import { useTheme } from '@contexts/ThemeContext';
-import { useAuth } from '@contexts/AuthContext';
 import { signUpWithEmail, signInWithGoogle } from '@services/authService';
 import { Ionicons } from '@expo/vector-icons';
 import { FormInput } from '@components/common/FormInput';
@@ -23,7 +22,6 @@ import { FormInput } from '@components/common/FormInput';
 type RegisterScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Register'>;
 
 interface RegisterFormData {
-  displayName: string;
   email: string;
   password: string;
   confirmPassword: string;
@@ -32,24 +30,19 @@ interface RegisterFormData {
 export const RegisterScreen: React.FC = () => {
   const navigation = useNavigation<RegisterScreenNavigationProp>();
   const { colors } = useTheme();
-  const { setUser } = useAuth();
   const [loading, setLoading] = useState(false);
 
   const {
     control,
     handleSubmit,
-    watch,
     formState: { errors },
   } = useForm<RegisterFormData>({
     defaultValues: {
-      displayName: '',
       email: '',
       password: '',
       confirmPassword: '',
     },
   });
-
-  const password = watch('password');
 
   const handleRegister = async (data: RegisterFormData) => {
     if (data.password !== data.confirmPassword) {
@@ -64,26 +57,31 @@ export const RegisterScreen: React.FC = () => {
 
     setLoading(true);
     try {
-      const user = await signUpWithEmail(data.email, data.password, data.displayName);
-      setUser(user);
-      navigation.navigate('Main');
+      await signUpWithEmail(data.email, data.password);
+      console.log('✅ Registration successful - Firebase auth listener will handle navigation');
+      // Don't call setUser or setLoading(false) here
+      // Firebase's onAuthStateChanged listener will automatically:
+      // 1. Detect the new user
+      // 2. Fetch user data from Firestore
+      // 3. Update the user state
+      // 4. Trigger navigation to Main screen
     } catch (error: any) {
+      console.error('❌ Registration failed:', error.message);
       Alert.alert('Registration Failed', error.message);
-    } finally {
-      setLoading(false);
+      setLoading(false); // Only stop loading on error
     }
   };
 
   const handleGoogleSignIn = async () => {
     setLoading(true);
     try {
-      const user = await signInWithGoogle();
-      setUser(user);
-      navigation.navigate('Main');
+      await signInWithGoogle();
+      console.log('✅ Google sign-in successful - Firebase auth listener will handle navigation');
+      // Firebase's onAuthStateChanged listener will handle the rest
     } catch (error: any) {
+      console.error('❌ Google sign-in failed:', error.message);
       Alert.alert('Google Sign-In Failed', error.message);
-    } finally {
-      setLoading(false);
+      setLoading(false); // Only stop loading on error
     }
   };
 
@@ -107,15 +105,6 @@ export const RegisterScreen: React.FC = () => {
         </View>
 
           <View style={styles.form}>
-            <FormInput
-              name="displayName"
-              control={control}
-              placeholder="Full Name"
-              icon="person-outline"
-              autoComplete="name"
-              error={errors.displayName}
-            />
-
             <FormInput
               name="email"
               control={control}

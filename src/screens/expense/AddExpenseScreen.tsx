@@ -12,11 +12,12 @@ import { useRoute, useNavigation } from '@react-navigation/native';
 import { useForm } from 'react-hook-form';
 import { useAuth } from '@contexts/AuthContext';
 import { useTheme } from '@contexts/ThemeContext';
-import { Group, ExpenseSplit } from '@types/index';
+import { Group, ExpenseSplit } from '../../types';
 import { Ionicons } from '@expo/vector-icons';
 import { FormInput } from '@components/common/FormInput';
+import { updateMemberBalances } from '@services/groupService';
 
-// Conditionally import Firebase modules (won't work in Expo Go)
+// Conditionally import Firebase modules
 let firestore: any = null;
 let database: any = null;
 try {
@@ -59,6 +60,10 @@ export const AddExpenseScreen: React.FC = () => {
   }, []);
 
   const loadGroup = async () => {
+    if (!firestore) {
+      Alert.alert('Not Available', 'Firebase is required.');
+      return;
+    }
     try {
       const groupDoc = await firestore().collection('groups').doc(groupId).get();
       if (groupDoc.exists) {
@@ -70,8 +75,8 @@ export const AddExpenseScreen: React.FC = () => {
   };
 
   const handleAddExpense = async (data: AddExpenseFormData) => {
-    if (!group || !user) {
-      Alert.alert('Error', 'Please fill in all required fields');
+    if (!group || !user || !database || !firestore) {
+      Alert.alert('Error', 'Something went wrong. Please try again.');
       return;
     }
 
@@ -86,7 +91,7 @@ export const AddExpenseScreen: React.FC = () => {
       // Calculate splits based on split type
       let splits: ExpenseSplit[] = [];
       if (splitType === 'equal') {
-        const splitAmount = numAmount / group.members.length;
+        const splitAmount = Math.round((numAmount / group.members.length) * 100) / 100;
         splits = group.members.map((member) => ({
           userId: member.userId,
           amount: splitAmount,
@@ -103,16 +108,21 @@ export const AddExpenseScreen: React.FC = () => {
         splitType,
         splits,
         description: data.description.trim(),
+        groupId,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
 
       await expenseRef.set(expenseData);
 
+      // Update member balances in Firestore
+      await updateMemberBalances(groupId, user.id, numAmount, splits);
+
       Alert.alert('Success', 'Expense added successfully!');
       navigation.goBack();
     } catch (error: any) {
-      Alert.alert('Error', error.message);
+      console.error('Add expense error:', error);
+      Alert.alert('Error', error.message || 'Failed to add expense');
     } finally {
       setLoading(false);
     }
@@ -125,87 +135,82 @@ export const AddExpenseScreen: React.FC = () => {
           <Ionicons name="receipt" size={60} color={colors.secondary} />
         </View>
 
-          <Text style={[styles.label, { color: colors.text }]}>Expense Title *</Text>
-          <FormInput
-            name="title"
-            control={control}
-            placeholder="e.g., Dinner, Gas, Movie tickets"
-            error={errors.title}
-          />
+        {group && (
+          <View style={[styles.groupInfo, { backgroundColor: colors.card }]}>
+            <Text style={[styles.groupName, { color: colors.text }]}>{group.name}</Text>
+            <Text style={[styles.groupMembers, { color: colors.textSecondary }]}>
+              {group.members.length} member{group.members.length !== 1 ? 's' : ''}
+            </Text>
+          </View>
+        )}
 
-          <Text style={[styles.label, { color: colors.text }]}>Amount *</Text>
-          <FormInput
-            name="amount"
-            control={control}
-            placeholder="0.00"
-            keyboardType="decimal-pad"
-            error={errors.amount}
-          />
+        <Text style={[styles.label, { color: colors.text }]}>Expense Title *</Text>
+        <FormInput
+          name="title"
+          control={control}
+          placeholder="e.g., Dinner, Gas, Movie tickets"
+          error={errors.title}
+        />
+
+        <Text style={[styles.label, { color: colors.text }]}>Amount *</Text>
+        <FormInput
+          name="amount"
+          control={control}
+          placeholder="0.00"
+          keyboardType="decimal-pad"
+          error={errors.amount}
+        />
 
         <Text style={[styles.label, { color: colors.text }]}>Split Type</Text>
         <View style={styles.splitTypeContainer}>
-          <TouchableOpacity
-            style={[
-              styles.splitTypeButton,
-              { borderColor: colors.border },
-              splitType === 'equal' && { backgroundColor: colors.primary, borderColor: colors.primary },
-            ]}
-            onPress={() => setSplitType('equal')}
-          >
-            <Text style={[
-              styles.splitTypeText,
-              { color: splitType === 'equal' ? '#fff' : colors.text },
-            ]}>
-              Equal
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.splitTypeButton,
-              { borderColor: colors.border },
-              splitType === 'custom' && { backgroundColor: colors.primary, borderColor: colors.primary },
-            ]}
-            onPress={() => setSplitType('custom')}
-          >
-            <Text style={[
-              styles.splitTypeText,
-              { color: splitType === 'custom' ? '#fff' : colors.text },
-            ]}>
-              Custom
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.splitTypeButton,
-              { borderColor: colors.border },
-              splitType === 'individual' && { backgroundColor: colors.primary, borderColor: colors.primary },
-            ]}
-            onPress={() => setSplitType('individual')}
-          >
-            <Text style={[
-              styles.splitTypeText,
-              { color: splitType === 'individual' ? '#fff' : colors.text },
-            ]}>
-              Individual
-            </Text>
-          </TouchableOpacity>
+          {(['equal', 'custom', 'individual'] as const).map((type) => (
+            <TouchableOpacity
+              key={type}
+              style={[
+                styles.splitTypeButton,
+                { borderColor: colors.border },
+                splitType === type && { backgroundColor: colors.primary, borderColor: colors.primary },
+              ]}
+              onPress={() => setSplitType(type)}
+            >
+              <Ionicons
+                name={type === 'equal' ? 'git-compare-outline' : type === 'custom' ? 'options-outline' : 'person-outline'}
+                size={18}
+                color={splitType === type ? '#fff' : colors.text}
+              />
+              <Text style={[
+                styles.splitTypeText,
+                { color: splitType === type ? '#fff' : colors.text },
+              ]}>
+                {type.charAt(0).toUpperCase() + type.slice(1)}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
 
-          <Text style={[styles.label, { color: colors.text }]}>Description (Optional)</Text>
-          <FormInput
-            name="description"
-            control={control}
-            placeholder="Add details about this expense"
-            multiline
-            numberOfLines={4}
-            error={errors.description}
-          />
+        {splitType === 'equal' && group && (
+          <View style={[styles.splitPreview, { backgroundColor: colors.card }]}>
+            <Text style={[styles.splitPreviewTitle, { color: colors.textSecondary }]}>
+              Split equally among {group.members.length} members
+            </Text>
+          </View>
+        )}
 
-          <TouchableOpacity
-            style={[styles.button, { backgroundColor: colors.primary }]}
-            onPress={handleSubmit(handleAddExpense)}
-            disabled={loading}
-          >
+        <Text style={[styles.label, { color: colors.text }]}>Description (Optional)</Text>
+        <FormInput
+          name="description"
+          control={control}
+          placeholder="Add details about this expense"
+          multiline
+          numberOfLines={3}
+          error={errors.description}
+        />
+
+        <TouchableOpacity
+          style={[styles.button, { backgroundColor: colors.primary }]}
+          onPress={handleSubmit(handleAddExpense)}
+          disabled={loading}
+        >
           {loading ? (
             <ActivityIndicator color="#fff" />
           ) : (
@@ -225,13 +230,27 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   iconContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     justifyContent: 'center',
     alignItems: 'center',
     alignSelf: 'center',
-    marginBottom: 32,
+    marginBottom: 20,
+  },
+  groupInfo: {
+    borderRadius: 10,
+    padding: 12,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  groupName: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  groupMembers: {
+    fontSize: 13,
+    marginTop: 2,
   },
   label: {
     fontSize: 16,
@@ -240,25 +259,38 @@ const styles = StyleSheet.create({
   },
   splitTypeContainer: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 20,
+    gap: 10,
+    marginBottom: 16,
   },
   splitTypeButton: {
     flex: 1,
+    flexDirection: 'row',
     paddingVertical: 12,
     borderRadius: 8,
     borderWidth: 1,
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
   },
   splitTypeText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
+  },
+  splitPreview: {
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+    alignItems: 'center',
+  },
+  splitPreviewTitle: {
+    fontSize: 13,
   },
   button: {
     height: 56,
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
+    marginTop: 8,
   },
   buttonText: {
     color: '#fff',

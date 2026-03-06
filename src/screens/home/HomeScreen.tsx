@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -24,6 +25,16 @@ try {
   console.warn('⚠️ Firebase Firestore not available (Expo Go mode)');
 }
 
+const GROUP_ICONS: Record<string, string> = {
+  trip: 'airplane-outline',
+  home: 'home-outline',
+  couple: 'heart-outline',
+  friends: 'people-outline',
+  work: 'briefcase-outline',
+  food: 'restaurant-outline',
+  other: 'grid-outline',
+};
+
 type HomeScreenNavigationProp = StackNavigationProp<HomeStackParamList, 'HomeScreen'> &
   DrawerNavigationProp<MainDrawerParamList>;
 
@@ -38,36 +49,59 @@ export const HomeScreen: React.FC = () => {
   useEffect(() => {
     if (!user) return;
 
-    // If Firebase is not available (Expo Go mode), just show empty state
     if (!firestore) {
       setGroups([]);
       setLoading(false);
-      setRefreshing(false);
       return;
     }
 
-    const unsubscribe = firestore()
-      .collection('groups')
-      .where('members', 'array-contains', { userId: user.id })
-      .onSnapshot((snapshot) => {
-        const groupsData = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as Group[];
-        setGroups(groupsData);
-        setLoading(false);
-        setRefreshing(false);
-      });
+    // Query using memberIds flat array (simple query, no composite index needed)
+    let unsubscribe: (() => void) | null = null;
+    try {
+      unsubscribe = firestore()
+        .collection('groups')
+        .where('memberIds', 'array-contains', user.id)
+        .onSnapshot(
+          (snapshot: any) => {
+            const groupsData = snapshot.docs.map((doc: any) => ({
+              id: doc.id,
+              ...doc.data(),
+            })) as Group[];
+            setGroups(groupsData);
+            setLoading(false);
+            setRefreshing(false);
+          },
+          (error: any) => {
+            console.error('Groups query error:', error);
+            setGroups([]);
+            setLoading(false);
+            setRefreshing(false);
+          }
+        );
+    } catch (error) {
+      console.error('Failed to setup groups listener:', error);
+      setGroups([]);
+      setLoading(false);
+    }
 
-    return () => unsubscribe();
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, [user]);
 
   const handleRefresh = () => {
     setRefreshing(true);
+    // The snapshot listener will automatically update
+    setTimeout(() => setRefreshing(false), 1000);
+  };
+
+  const getGroupIcon = (category?: string) => {
+    return (GROUP_ICONS[category || 'other'] || GROUP_ICONS.other) as any;
   };
 
   const renderGroupCard = ({ item }: { item: Group }) => {
-    const totalBalance = item.members.find((m) => m.userId === user?.id)?.balance || 0;
+    const myMember = item.members?.find((m) => m.userId === user?.id);
+    const totalBalance = myMember?.balance || 0;
     const balanceColor = totalBalance > 0 ? colors.success : totalBalance < 0 ? colors.error : colors.textSecondary;
 
     return (
@@ -77,19 +111,20 @@ export const HomeScreen: React.FC = () => {
       >
         <View style={styles.groupHeader}>
           <View style={[styles.groupIcon, { backgroundColor: colors.primary + '20' }]}>
-            <Ionicons name="people" size={24} color={colors.primary} />
+            <Ionicons name={getGroupIcon((item as any).category)} size={24} color={colors.primary} />
           </View>
           <View style={styles.groupInfo}>
             <Text style={[styles.groupName, { color: colors.text }]}>{item.name}</Text>
             <Text style={[styles.membersCount, { color: colors.textSecondary }]}>
-              {item.members.length} members
+              {item.members?.length || 1} member{(item.members?.length || 1) !== 1 ? 's' : ''}
             </Text>
           </View>
+          <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
         </View>
-        <View style={styles.balanceContainer}>
+        <View style={[styles.balanceContainer, { borderTopColor: colors.border }]}>
           <Text style={[styles.balanceLabel, { color: colors.textSecondary }]}>Your balance</Text>
           <Text style={[styles.balanceAmount, { color: balanceColor }]}>
-            ${Math.abs(totalBalance).toFixed(2)}
+            {totalBalance >= 0 ? '+' : '-'}${Math.abs(totalBalance).toFixed(2)}
           </Text>
           <Text style={[styles.balanceStatus, { color: balanceColor }]}>
             {totalBalance > 0 ? 'you are owed' : totalBalance < 0 ? 'you owe' : 'settled up'}
@@ -109,23 +144,30 @@ export const HomeScreen: React.FC = () => {
         <View style={{ width: 28 }} />
       </View>
 
-      <FlatList
-        data={groups}
-        renderItem={renderGroupCard}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-        }
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Ionicons name="people-outline" size={80} color={colors.textSecondary} />
-            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-              No groups yet. Create one to get started!
-            </Text>
-          </View>
-        }
-      />
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      ) : (
+        <FlatList
+          data={groups}
+          renderItem={renderGroupCard}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Ionicons name="people-outline" size={80} color={colors.textSecondary} />
+              <Text style={[styles.emptyTitle, { color: colors.text }]}>No groups yet</Text>
+              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                Create a group to start splitting expenses with friends!
+              </Text>
+            </View>
+          }
+        />
+      )}
 
       <TouchableOpacity
         style={[styles.fab, { backgroundColor: colors.primary }]}
@@ -157,8 +199,14 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   listContent: {
     padding: 16,
+    paddingBottom: 100,
   },
   groupCard: {
     borderRadius: 12,
@@ -194,7 +242,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#e2e8f0',
   },
   balanceLabel: {
     fontSize: 12,
@@ -213,10 +260,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingTop: 80,
   },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginTop: 16,
+    marginBottom: 8,
+  },
   emptyText: {
     fontSize: 16,
     textAlign: 'center',
-    marginTop: 16,
     paddingHorizontal: 40,
   },
   fab: {

@@ -2,6 +2,7 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { useAuth } from '@contexts/AuthContext';
+import { useOnboarding } from '@contexts/OnboardingContext';
 import { OnboardingScreen } from '@screens/onboarding/OnboardingScreen';
 import { LoginScreen } from '@screens/auth/LoginScreen';
 import { RegisterScreen } from '@screens/auth/RegisterScreen';
@@ -12,8 +13,9 @@ const Stack = createStackNavigator<RootStackParamList>();
 
 export const AppNavigator: React.FC = () => {
   const { user, loading } = useAuth();
+  const { hasCompletedOnboarding, loading: onboardingLoading } = useOnboarding();
 
-  if (loading) {
+  if (loading || onboardingLoading) {
     return null; // You can add a loading screen here
   }
 
@@ -24,7 +26,9 @@ export const AppNavigator: React.FC = () => {
           <Stack.Screen name="Main" component={DrawerNavigator} />
         ) : (
           <>
-            <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+            {!hasCompletedOnboarding && (
+              <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+            )}
             <Stack.Screen name="Login" component={LoginScreen} />
             <Stack.Screen name="Register" component={RegisterScreen} />
           </>

@@ -1,14 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { getUserData } from '@services/authService';
 import { User } from '@types/index';
-
-// Conditionally import Firebase auth (won't work in Expo Go)
-let auth: any = null;
-try {
-  auth = require('@react-native-firebase/auth').default;
-} catch (error) {
-  console.warn('⚠️ Firebase Auth not available in AuthContext (Expo Go mode)');
-}
+import { auth, isFirebaseAvailable } from '@services/firebase';
 
 interface AuthContextType {
   user: User | null;
@@ -23,26 +16,38 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    console.log('🔄 AuthContext: Setting up auth listener...');
+    console.log('🔥 Firebase available:', isFirebaseAvailable);
+
     // If Firebase auth is not available (Expo Go mode), just set loading to false
-    if (!auth) {
+    if (!auth || !isFirebaseAvailable) {
+      console.log('⚠️ AuthContext: Firebase not available (Expo Go mode)');
+      console.log('💡 Use test@example.com / test123 for testing');
       setLoading(false);
       return;
     }
 
     // Set up auth state listener for React Native Firebase
     const unsubscribe = auth().onAuthStateChanged(async (firebaseUser: any) => {
+      console.log('🔄 AuthContext: Auth state changed');
+      console.log('👤 Firebase user:', firebaseUser?.email || 'null');
+
       if (firebaseUser) {
         try {
+          console.log('📄 AuthContext: Fetching user data from Firestore...');
           const userData = await getUserData(firebaseUser.uid);
+          console.log('✅ AuthContext: User data fetched:', userData?.displayName);
           setUser(userData);
         } catch (error) {
-          console.error('Error fetching user data:', error);
+          console.error('❌ AuthContext: Error fetching user data:', error);
           setUser(null);
         }
       } else {
+        console.log('🚪 AuthContext: No user signed in');
         setUser(null);
       }
       setLoading(false);
+      console.log('✅ AuthContext: Loading complete');
     });
 
     return unsubscribe;

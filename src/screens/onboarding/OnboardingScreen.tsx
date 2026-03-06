@@ -1,18 +1,11 @@
-import React, { useState, useRef } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  Dimensions,
-  StyleSheet,
-  Image,
-} from 'react-native';
+import React, { useCallback, useRef, useState } from 'react';
+import { View, Text, FlatList, TouchableOpacity, Dimensions, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '@types/index';
 import { useTheme } from '@contexts/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
+import { useOnboarding } from '@contexts/OnboardingContext';
 
 const { width, height } = Dimensions.get('window');
 
@@ -60,19 +53,32 @@ type OnboardingScreenNavigationProp = StackNavigationProp<RootStackParamList, 'O
 export const OnboardingScreen: React.FC = () => {
   const navigation = useNavigation<OnboardingScreenNavigationProp>();
   const { colors, theme } = useTheme();
+  const { completeOnboarding } = useOnboarding();
   const [currentIndex, setCurrentIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
+
+  const navigateToLogin = useCallback(() => {
+    navigation.reset({
+      index: 0,
+      routes: [{ name: 'Login' }],
+    });
+  }, [navigation]);
+
+  const finishOnboarding = useCallback(async () => {
+    await completeOnboarding();
+    navigateToLogin();
+  }, [completeOnboarding, navigateToLogin]);
 
   const handleNext = () => {
     if (currentIndex < slides.length - 1) {
       flatListRef.current?.scrollToIndex({ index: currentIndex + 1 });
     } else {
-      navigation.navigate('Login');
+      finishOnboarding();
     }
   };
 
   const handleSkip = () => {
-    navigation.navigate('Login');
+    finishOnboarding();
   };
 
   const onViewableItemsChanged = useRef(({ viewableItems }: any) => {

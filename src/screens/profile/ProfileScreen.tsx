@@ -8,21 +8,28 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import * as ImagePicker from 'expo-image-picker';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
+import { DrawerNavigationProp } from '@react-navigation/drawer';
 import { updateUserProfile } from '@services/authService';
 import { useAuth } from '@contexts/AuthContext';
 import { useTheme } from '@contexts/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { FormInput } from '@components/common/FormInput';
+import type { MainDrawerParamList } from '@types/index';
 
 // Conditionally import Firebase Storage (won't work in Expo Go)
 let storage: any = null;
+let firestore: any = null;
 try {
   storage = require('@react-native-firebase/storage').default;
+  firestore = require('@react-native-firebase/firestore').default;
 } catch (error) {
-  console.warn('⚠️ Firebase Storage not available (Expo Go mode)');
+  console.warn('⚠️ Firebase Storage/Firestore not available (Expo Go mode)');
 }
 
 interface ProfileFormData {
@@ -31,16 +38,48 @@ interface ProfileFormData {
   dateOfBirth: string;
 }
 
+type ProfileRouteProp = RouteProp<MainDrawerParamList, 'Profile'>;
+type ProfileNavigationProp = DrawerNavigationProp<MainDrawerParamList, 'Profile'>;
+
+const formatDate = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const formatDisplayDate = (dateStr: string): string => {
+  if (!dateStr) return 'Not set';
+  try {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-IN', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+  } catch {
+    return dateStr;
+  }
+};
+
 export const ProfileScreen: React.FC = () => {
+  const route = useRoute<ProfileRouteProp>();
+  const navigation = useNavigation<ProfileNavigationProp>();
   const { user, setUser } = useAuth();
   const { colors } = useTheme();
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date>(
+    user?.dateOfBirth ? new Date(user.dateOfBirth) : new Date(2000, 0, 1)
+  );
 
   const {
     control,
     handleSubmit,
     reset,
+    setValue,
+    watch,
     formState: { errors },
   } = useForm<ProfileFormData>({
     defaultValues: {
@@ -50,6 +89,8 @@ export const ProfileScreen: React.FC = () => {
     },
   });
 
+  const dobValue = watch('dateOfBirth');
+
   useEffect(() => {
     if (user) {
       reset({
@@ -57,29 +98,50 @@ export const ProfileScreen: React.FC = () => {
         phoneNumber: user.phoneNumber || '',
         dateOfBirth: user.dateOfBirth || '',
       });
+      if (user.dateOfBirth) {
+        setSelectedDate(new Date(user.dateOfBirth));
+      }
     }
   }, [user, reset]);
 
+  useEffect(() => {
+    if (route.params?.startEditing) {
+      setEditing(true);
+      navigation.setParams({ startEditing: undefined });
+    }
+  }, [route.params?.startEditing, navigation]);
+
+  useEffect(() => {
+    if (user?.needsProfileSetup) {
+      setEditing(true);
+    }
+  }, [user?.needsProfileSetup]);
+
+  const handleDateChange = (event: DateTimePickerEvent, date?: Date) => {
+    if (Platform.OS === 'android') {
+      setShowDatePicker(false);
+    }
+    if (event.type === 'set' && date) {
+      setSelectedDate(date);
+      setValue('dateOfBirth', formatDate(date));
+    }
+  };
+
   const handlePickImage = async () => {
-    // Check if Firebase Storage is available
     if (!storage) {
-      Alert.alert(
-        'Feature Not Available',
-        'Profile picture upload is not available in Expo Go.\n\nFor full features, run:\nnpx expo prebuild && npx expo run:android'
-      );
+      Alert.alert('Feature Not Available', 'Profile picture upload requires Firebase Storage.');
       return;
     }
 
     try {
       const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-      if (permissionResult.granted === false) {
+      if (!permissionResult.granted) {
         Alert.alert('Permission Required', 'Permission to access camera roll is required!');
         return;
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.5,
@@ -90,19 +152,40 @@ export const ProfileScreen: React.FC = () => {
         const imageUri = result.assets[0].uri;
 
         // Upload to Firebase Storage
-        const reference = storage().ref(`profile_images/${user.id}`);
-        await reference.putFile(imageUri);
+        const reference = storage().ref(`profile_images/${user.id}.jpg`);
+
+        // expo-image-picker returns file:// URIs on both platforms
+        // putFile works with local file paths
+        const localPath = Platform.OS === 'ios' ? imageUri.replace('file://', '') : imageUri;
+        await reference.putFile(localPath);
         const photoURL = await reference.getDownloadURL();
 
-        // Update user profile
-        await updateUserProfile(user.id, { photoURL });
-        setUser({ ...user, photoURL });
+        // Update user profile in Firestore
+        if (firestore) {
+          await firestore().collection('users').doc(user.id).set(
+            { photoURL, updatedAt: new Date() },
+            { merge: true }
+          );
+        }
 
+        // Update Firebase Auth profile
+        try {
+          const auth = require('@react-native-firebase/auth').default;
+          const currentUser = auth().currentUser;
+          if (currentUser) {
+            await currentUser.updateProfile({ photoURL });
+          }
+        } catch (e) {
+          console.warn('Could not update auth profile photo:', e);
+        }
+
+        setUser({ ...user, photoURL });
         Alert.alert('Success', 'Profile picture updated!');
         setLoading(false);
       }
     } catch (error: any) {
-      Alert.alert('Error', error.message);
+      console.error('Image upload error:', error);
+      Alert.alert('Error', error.message || 'Failed to upload image');
       setLoading(false);
     }
   };
@@ -112,23 +195,46 @@ export const ProfileScreen: React.FC = () => {
 
     setLoading(true);
     try {
-      await updateUserProfile(user.id, {
-        displayName: data.displayName,
-        phoneNumber: data.phoneNumber,
-        dateOfBirth: data.dateOfBirth,
-      });
+      // Use set with merge to handle both new and existing documents
+      if (firestore) {
+        await firestore().collection('users').doc(user.id).set(
+          {
+            displayName: data.displayName.trim(),
+            phoneNumber: data.phoneNumber.trim(),
+            dateOfBirth: data.dateOfBirth,
+            needsProfileSetup: false,
+            updatedAt: new Date(),
+          },
+          { merge: true }
+        );
+      }
+
+      // Update Firebase Auth display name
+      try {
+        const auth = require('@react-native-firebase/auth').default;
+        const currentUser = auth().currentUser;
+        if (currentUser) {
+          await currentUser.updateProfile({
+            displayName: data.displayName.trim(),
+          });
+        }
+      } catch (e) {
+        console.warn('Could not update auth display name:', e);
+      }
 
       setUser({
         ...user,
-        displayName: data.displayName,
-        phoneNumber: data.phoneNumber,
+        displayName: data.displayName.trim(),
+        phoneNumber: data.phoneNumber.trim(),
         dateOfBirth: data.dateOfBirth,
+        needsProfileSetup: false,
       });
 
       setEditing(false);
       Alert.alert('Success', 'Profile updated successfully!');
     } catch (error: any) {
-      Alert.alert('Error', error.message);
+      console.error('Profile update error:', error);
+      Alert.alert('Error', error.message || 'Failed to update profile');
     } finally {
       setLoading(false);
     }
@@ -141,6 +247,9 @@ export const ProfileScreen: React.FC = () => {
       phoneNumber: user?.phoneNumber || '',
       dateOfBirth: user?.dateOfBirth || '',
     });
+    if (user?.dateOfBirth) {
+      setSelectedDate(new Date(user.dateOfBirth));
+    }
   };
 
   return (
@@ -174,94 +283,121 @@ export const ProfileScreen: React.FC = () => {
           </Text>
         </View>
 
-          <View style={[styles.infoCard, { backgroundColor: colors.card }]}>
-            {editing ? (
-              <>
-                <View style={[styles.formRow, { borderBottomColor: colors.border }]}>
-                  <Ionicons name="person-outline" size={24} color={colors.textSecondary} />
-                  <View style={styles.formInputWrapper}>
-                    <FormInput
-                      name="displayName"
-                      control={control}
-                      placeholder="Display Name"
-                      error={errors.displayName}
-                    />
-                  </View>
+        <View style={[styles.infoCard, { backgroundColor: colors.card }]}>
+          {editing ? (
+            <>
+              <View style={[styles.formRow, { borderBottomColor: colors.border }]}>
+                <Ionicons name="person-outline" size={24} color={colors.textSecondary} />
+                <View style={styles.formInputWrapper}>
+                  <FormInput
+                    name="displayName"
+                    control={control}
+                    placeholder="Display Name"
+                    error={errors.displayName}
+                  />
                 </View>
+              </View>
 
-                <View style={[styles.formRow, { borderBottomColor: colors.border }]}>
-                  <Ionicons name="call-outline" size={24} color={colors.textSecondary} />
-                  <View style={styles.formInputWrapper}>
-                    <FormInput
-                      name="phoneNumber"
-                      control={control}
-                      placeholder="Phone Number"
-                      keyboardType="phone-pad"
-                      error={errors.phoneNumber}
-                    />
-                  </View>
+              <View style={[styles.formRow, { borderBottomColor: colors.border }]}>
+                <Ionicons name="call-outline" size={24} color={colors.textSecondary} />
+                <View style={styles.formInputWrapper}>
+                  <FormInput
+                    name="phoneNumber"
+                    control={control}
+                    placeholder="Phone Number"
+                    keyboardType="phone-pad"
+                    error={errors.phoneNumber}
+                  />
                 </View>
+              </View>
 
-                <View style={[styles.formRow, { borderBottomColor: colors.border }]}>
-                  <Ionicons name="calendar-outline" size={24} color={colors.textSecondary} />
-                  <View style={styles.formInputWrapper}>
-                    <FormInput
-                      name="dateOfBirth"
-                      control={control}
-                      placeholder="Date of Birth (YYYY-MM-DD)"
-                      error={errors.dateOfBirth}
-                    />
-                  </View>
-                </View>
-              </>
-            ) : (
-              <>
-                <View style={[styles.infoRow, { borderBottomColor: colors.border }]}>
-                  <Ionicons name="person-outline" size={24} color={colors.textSecondary} />
-                  <View style={styles.infoTextContainer}>
-                    <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Name</Text>
-                    <Text style={[styles.infoValue, { color: colors.text }]}>
-                      {user?.displayName || 'Not set'}
+              <View style={[styles.formRow, { borderBottomColor: colors.border }]}>
+                <Ionicons name="calendar-outline" size={24} color={colors.textSecondary} />
+                <View style={styles.formInputWrapper}>
+                  <TouchableOpacity
+                    style={[styles.datePickerButton, { borderColor: colors.border, backgroundColor: colors.card }]}
+                    onPress={() => setShowDatePicker(true)}
+                  >
+                    <Text style={[styles.datePickerText, { color: dobValue ? colors.text : colors.textSecondary }]}>
+                      {dobValue ? formatDisplayDate(dobValue) : 'Select Date of Birth'}
                     </Text>
-                  </View>
+                    <Ionicons name="calendar" size={20} color={colors.textSecondary} />
+                  </TouchableOpacity>
                 </View>
+              </View>
 
-                <View style={[styles.infoRow, { borderBottomColor: colors.border }]}>
-                  <Ionicons name="call-outline" size={24} color={colors.textSecondary} />
-                  <View style={styles.infoTextContainer}>
-                    <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Phone</Text>
-                    <Text style={[styles.infoValue, { color: colors.text }]}>
-                      {user?.phoneNumber || 'Not set'}
-                    </Text>
-                  </View>
+              {showDatePicker && (
+                <View>
+                  <DateTimePicker
+                    value={selectedDate}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={handleDateChange}
+                    maximumDate={new Date()}
+                    minimumDate={new Date(1920, 0, 1)}
+                  />
+                  {Platform.OS === 'ios' && (
+                    <TouchableOpacity
+                      style={[styles.dateConfirmButton, { backgroundColor: colors.primary }]}
+                      onPress={() => {
+                        setShowDatePicker(false);
+                        setValue('dateOfBirth', formatDate(selectedDate));
+                      }}
+                    >
+                      <Text style={styles.dateConfirmText}>Done</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
+              )}
+            </>
+          ) : (
+            <>
+              <View style={[styles.infoRow, { borderBottomColor: colors.border }]}>
+                <Ionicons name="person-outline" size={24} color={colors.textSecondary} />
+                <View style={styles.infoTextContainer}>
+                  <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Name</Text>
+                  <Text style={[styles.infoValue, { color: colors.text }]}>
+                    {user?.displayName || 'Not set'}
+                  </Text>
+                </View>
+              </View>
 
-                <View style={[styles.infoRow, { borderBottomColor: colors.border }]}>
-                  <Ionicons name="calendar-outline" size={24} color={colors.textSecondary} />
-                  <View style={styles.infoTextContainer}>
-                    <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Date of Birth</Text>
-                    <Text style={[styles.infoValue, { color: colors.text }]}>
-                      {user?.dateOfBirth || 'Not set'}
-                    </Text>
-                  </View>
+              <View style={[styles.infoRow, { borderBottomColor: colors.border }]}>
+                <Ionicons name="call-outline" size={24} color={colors.textSecondary} />
+                <View style={styles.infoTextContainer}>
+                  <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Phone</Text>
+                  <Text style={[styles.infoValue, { color: colors.text }]}>
+                    {user?.phoneNumber || 'Not set'}
+                  </Text>
                 </View>
-              </>
-            )}
-          </View>
+              </View>
+
+              <View style={[styles.infoRow, { borderBottomColor: colors.border }]}>
+                <Ionicons name="calendar-outline" size={24} color={colors.textSecondary} />
+                <View style={styles.infoTextContainer}>
+                  <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Date of Birth</Text>
+                  <Text style={[styles.infoValue, { color: colors.text }]}>
+                    {formatDisplayDate(user?.dateOfBirth || '')}
+                  </Text>
+                </View>
+              </View>
+            </>
+          )}
+        </View>
 
         {editing ? (
           <View style={styles.buttonRow}>
-              <TouchableOpacity
-                style={[styles.button, styles.cancelButton, { borderColor: colors.border }]}
-                onPress={handleCancel}
-              >
-                <Text style={[styles.cancelButtonText, { color: colors.text }]}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.button, styles.saveButton, { backgroundColor: colors.primary }]}
-                onPress={handleSubmit(handleSave)}
-                disabled={loading}
-              >
+            <TouchableOpacity
+              style={[styles.button, styles.cancelButton, { borderColor: colors.border }]}
+              onPress={handleCancel}
+            >
+              <Text style={[styles.cancelButtonText, { color: colors.text }]}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.button, styles.saveButton, { backgroundColor: colors.primary }]}
+              onPress={handleSubmit(handleSave)}
+              disabled={loading}
+            >
               {loading ? (
                 <ActivityIndicator color="#fff" />
               ) : (
@@ -343,7 +479,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
   },
   infoTextContainer: {
     marginLeft: 16,
@@ -366,6 +501,32 @@ const styles = StyleSheet.create({
   formInputWrapper: {
     flex: 1,
     marginLeft: 16,
+  },
+  datePickerButton: {
+    height: 56,
+    borderWidth: 1,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  datePickerText: {
+    fontSize: 16,
+  },
+  dateConfirmButton: {
+    alignSelf: 'center',
+    paddingHorizontal: 32,
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  dateConfirmText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   buttonRow: {
     flexDirection: 'row',
