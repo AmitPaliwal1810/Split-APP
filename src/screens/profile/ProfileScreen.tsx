@@ -15,13 +15,13 @@ import { useForm, Controller } from 'react-hook-form';
 import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
-import { DrawerNavigationProp } from '@react-navigation/drawer';
-import { updateUserProfile } from '@services/authService';
+import { StackNavigationProp } from '@react-navigation/stack';
+import { updateUserProfile, signOut } from '@services/authService';
 import { useAuth } from '@contexts/AuthContext';
 import { useTheme } from '@contexts/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { FormInput } from '@components/common/FormInput';
-import type { MainDrawerParamList } from '@types/index';
+import type { HomeStackParamList } from '@types/index';
 
 // Cloudinary config (public values, safe to hardcode)
 const CLOUDINARY_CLOUD_NAME = 'ecommerece';
@@ -59,8 +59,8 @@ interface ProfileFormData {
   dateOfBirth: string;
 }
 
-type ProfileRouteProp = RouteProp<MainDrawerParamList, 'Profile'>;
-type ProfileNavigationProp = DrawerNavigationProp<MainDrawerParamList, 'Profile'>;
+type ProfileRouteProp = RouteProp<HomeStackParamList, 'Profile'>;
+type ProfileNavigationProp = StackNavigationProp<HomeStackParamList, 'Profile'>;
 
 const formatDate = (date: Date): string => {
   const year = date.getFullYear();
@@ -87,7 +87,7 @@ export const ProfileScreen: React.FC = () => {
   const route = useRoute<ProfileRouteProp>();
   const navigation = useNavigation<ProfileNavigationProp>();
   const { user, setUser } = useAuth();
-  const { colors } = useTheme();
+  const { colors, theme, toggleTheme } = useTheme();
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -137,6 +137,24 @@ export const ProfileScreen: React.FC = () => {
       setEditing(true);
     }
   }, [user?.needsProfileSetup]);
+
+  const handleSignOut = async () => {
+    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Sign Out',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await signOut();
+            setUser(null);
+          } catch (error: any) {
+            Alert.alert('Error', error.message || 'Failed to sign out');
+          }
+        },
+      },
+    ]);
+  };
 
   const handleDateChange = (event: DateTimePickerEvent, date?: Date) => {
     if (Platform.OS === 'android') {
@@ -424,6 +442,28 @@ export const ProfileScreen: React.FC = () => {
             <Text style={styles.editButtonText}>Edit Profile</Text>
           </TouchableOpacity>
         )}
+
+        <TouchableOpacity
+          style={[styles.themeButton, { backgroundColor: colors.card, borderColor: colors.border }]}
+          onPress={toggleTheme}
+        >
+          <Ionicons
+            name={theme === 'light' ? 'moon-outline' : 'sunny-outline'}
+            size={20}
+            color={colors.text}
+          />
+          <Text style={[styles.themeButtonText, { color: colors.text }]}>
+            {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.logoutButton, { borderColor: colors.error }]}
+          onPress={handleSignOut}
+        >
+          <Ionicons name="log-out-outline" size={20} color={colors.error} />
+          <Text style={[styles.logoutButtonText, { color: colors.error }]}>Sign Out</Text>
+        </TouchableOpacity>
       </View>
     </ScrollView>
   );
@@ -574,5 +614,33 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '700',
+  },
+  themeButton: {
+    flexDirection: 'row',
+    height: 56,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 12,
+    borderWidth: 1,
+  },
+  themeButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  logoutButton: {
+    flexDirection: 'row',
+    height: 56,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 12,
+    borderWidth: 1,
+  },
+  logoutButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

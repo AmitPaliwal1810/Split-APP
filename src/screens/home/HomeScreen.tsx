@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
+  Image,
   FlatList,
   TouchableOpacity,
   StyleSheet,
@@ -10,12 +11,11 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { DrawerNavigationProp } from '@react-navigation/drawer';
 import { useAuth } from '@contexts/AuthContext';
 import { useTheme } from '@contexts/ThemeContext';
 import { Group } from '@types/index';
 import { Ionicons } from '@expo/vector-icons';
-import { HomeStackParamList, MainDrawerParamList } from '@types/index';
+import { HomeStackParamList } from '@types/index';
 
 // Conditionally import Firebase Firestore (won't work in Expo Go)
 let firestore: any = null;
@@ -35,8 +35,7 @@ const GROUP_ICONS: Record<string, string> = {
   other: 'grid-outline',
 };
 
-type HomeScreenNavigationProp = StackNavigationProp<HomeStackParamList, 'HomeScreen'> &
-  DrawerNavigationProp<MainDrawerParamList>;
+type HomeScreenNavigationProp = StackNavigationProp<HomeStackParamList, 'HomeScreen'>;
 
 export const HomeScreen: React.FC = () => {
   const navigation = useNavigation<HomeScreenNavigationProp>();
@@ -137,11 +136,19 @@ export const HomeScreen: React.FC = () => {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { backgroundColor: colors.card }]}>
-        <TouchableOpacity onPress={() => navigation.openDrawer()}>
-          <Ionicons name="menu" size={28} color={colors.text} />
-        </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.text }]}>Split Bills</Text>
-        <View style={{ width: 28 }} />
+        <TouchableOpacity
+          onPress={() => navigation.navigate('Profile')}
+          style={[styles.avatarButton, { backgroundColor: colors.primary + '20' }]}
+        >
+          {user?.photoURL ? (
+            <Image source={{ uri: user.photoURL }} style={styles.avatarImage} />
+          ) : (
+            <Text style={[styles.avatarInitial, { color: colors.primary }]}>
+              {(user?.displayName || user?.email || 'U').charAt(0).toUpperCase()}
+            </Text>
+          )}
+        </TouchableOpacity>
       </View>
 
       {loading ? (
@@ -197,6 +204,23 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 20,
+    fontWeight: 'bold',
+    flex: 1,
+  },
+  avatarButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarImage: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+  },
+  avatarInitial: {
+    fontSize: 16,
     fontWeight: 'bold',
   },
   loadingContainer: {

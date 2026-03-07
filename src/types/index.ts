@@ -81,6 +81,7 @@ export type HomeStackParamList = {
   ExpenseDetail: { expenseId: string; groupId: string };
   CreateGroup: undefined;
   AddMembers: { groupId: string };
+  Profile: { startEditing?: boolean } | undefined;
 };
 
 export interface ThemeColors {

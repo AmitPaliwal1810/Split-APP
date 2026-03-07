@@ -8,7 +8,8 @@ import { AddExpenseScreen } from '@screens/expense/AddExpenseScreen';
 import { AddMembersScreen } from '@screens/groups/AddMembersScreen';
 import { EditGroupScreen } from '@screens/groups/EditGroupScreen';
 import { ExpenseDetailScreen } from '@screens/expense/ExpenseDetailScreen';
-import { HomeStackParamList } from '@types/index';
+import { ProfileScreen } from '@screens/profile/ProfileScreen';
+import { HomeStackParamList } from '../types';
 
 const Stack = createStackNavigator<HomeStackParamList>();
 
@@ -61,6 +62,11 @@ export const HomeNavigator: React.FC = () => {
         name="ExpenseDetail"
         component={ExpenseDetailScreen}
         options={{ title: 'Expense Details' }}
+      />
+      <Stack.Screen
+        name="Profile"
+        component={ProfileScreen}
+        options={{ title: 'Profile' }}
       />
     </Stack.Navigator>
   );

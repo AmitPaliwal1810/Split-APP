@@ -6,7 +6,7 @@ import { useOnboarding } from '@contexts/OnboardingContext';
 import { OnboardingScreen } from '@screens/onboarding/OnboardingScreen';
 import { LoginScreen } from '@screens/auth/LoginScreen';
 import { RegisterScreen } from '@screens/auth/RegisterScreen';
-import { DrawerNavigator } from './DrawerNavigator';
+import { HomeNavigator } from './HomeNavigator';
 import { RootStackParamList } from '@types/index';
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -23,7 +23,7 @@ export const AppNavigator: React.FC = () => {
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {user ? (
-          <Stack.Screen name="Main" component={DrawerNavigator} />
+          <Stack.Screen name="Main" component={HomeNavigator} />
         ) : (
           <>
             {!hasCompletedOnboarding && (
