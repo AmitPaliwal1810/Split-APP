@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Platform,
 } from 'react-native';
+
 import { useForm, Controller } from 'react-hook-form';
 import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
@@ -22,15 +23,35 @@ import { Ionicons } from '@expo/vector-icons';
 import { FormInput } from '@components/common/FormInput';
 import type { MainDrawerParamList } from '@types/index';
 
-// Conditionally import Firebase Storage (won't work in Expo Go)
-let storage: any = null;
+// Cloudinary config (public values, safe to hardcode)
+const CLOUDINARY_CLOUD_NAME = 'ecommerece';
+const CLOUDINARY_UPLOAD_PRESET = 'ozyrxz4b';
+
+// Conditionally import Firestore
 let firestore: any = null;
 try {
-  storage = require('@react-native-firebase/storage').default;
   firestore = require('@react-native-firebase/firestore').default;
 } catch (error) {
-  console.warn('⚠️ Firebase Storage/Firestore not available (Expo Go mode)');
+  console.warn('⚠️ Firestore not available (Expo Go mode)');
 }
+
+const uploadToCloudinary = async (imageUri: string): Promise<string> => {
+  const formData = new FormData();
+  formData.append('file', {
+    uri: imageUri,
+    type: 'image/jpeg',
+    name: 'profile.jpg',
+  } as any);
+  formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+
+  const response = await fetch(
+    `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+    { method: 'POST', body: formData }
+  );
+  const data = await response.json();
+  if (!data.secure_url) throw new Error(data.error?.message || 'Upload failed');
+  return data.secure_url;
+};
 
 interface ProfileFormData {
   displayName: string;
@@ -128,11 +149,6 @@ export const ProfileScreen: React.FC = () => {
   };
 
   const handlePickImage = async () => {
-    if (!storage) {
-      Alert.alert('Feature Not Available', 'Profile picture upload requires Firebase Storage.');
-      return;
-    }
-
     try {
       const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permissionResult.granted) {
@@ -151,16 +167,10 @@ export const ProfileScreen: React.FC = () => {
         setLoading(true);
         const imageUri = result.assets[0].uri;
 
-        // Upload to Firebase Storage
-        const reference = storage().ref(`profile_images/${user.id}.jpg`);
+        // Upload to Cloudinary
+        const photoURL = await uploadToCloudinary(imageUri);
 
-        // expo-image-picker returns file:// URIs on both platforms
-        // putFile works with local file paths
-        const localPath = Platform.OS === 'ios' ? imageUri.replace('file://', '') : imageUri;
-        await reference.putFile(localPath);
-        const photoURL = await reference.getDownloadURL();
-
-        // Update user profile in Firestore
+        // Update Firestore
         if (firestore) {
           await firestore().collection('users').doc(user.id).set(
             { photoURL, updatedAt: new Date() },
