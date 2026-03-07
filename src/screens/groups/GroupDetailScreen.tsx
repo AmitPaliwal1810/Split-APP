@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { HomeStackParamList } from '../../types';
 import { APP_CONFIG } from '@constants/config';
 import * as SMS from 'expo-sms';
+import { deleteGroup } from '@services/groupService';
 
 // Conditionally import Firebase modules
 let firestore: any = null;
@@ -40,27 +41,56 @@ export const GroupDetailScreen: React.FC = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const handleDelete = () => {
+    Alert.alert(
+      'Delete Group',
+      `Are you sure you want to delete "${group?.name}"? This action cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteGroup(groupId);
+              navigation.goBack();
+            } catch (error: any) {
+              Alert.alert('Error', error.message || 'Failed to delete group');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   useLayoutEffect(() => {
     if (!group) return;
+    const isCreator = group.createdBy === user?.id;
     navigation.setOptions({
       title: group.name,
       headerRight: () => (
-        <TouchableOpacity
-          style={{ marginRight: 16 }}
-          onPress={() =>
-            navigation.navigate('EditGroup' as any, {
-              groupId,
-              currentName: group.name,
-              currentDescription: group.description || '',
-              currentCategory: (group as any).category || 'other',
-            })
-          }
-        >
-          <Ionicons name="create-outline" size={24} color={colors.primary} />
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: 8, marginRight: 12 }}>
+          <TouchableOpacity
+            onPress={() =>
+              navigation.navigate('EditGroup' as any, {
+                groupId,
+                currentName: group.name,
+                currentDescription: group.description || '',
+                currentCategory: (group as any).category || 'other',
+              })
+            }
+          >
+            <Ionicons name="create-outline" size={24} color={colors.primary} />
+          </TouchableOpacity>
+          {isCreator && (
+            <TouchableOpacity onPress={handleDelete}>
+              <Ionicons name="trash-outline" size={24} color={colors.error} />
+            </TouchableOpacity>
+          )}
+        </View>
       ),
     });
-  }, [group, navigation, groupId, colors.primary]);
+  }, [group, navigation, groupId, colors.primary, colors.error, user?.id]);
 
   useEffect(() => {
     if (!firestore || !database) {
