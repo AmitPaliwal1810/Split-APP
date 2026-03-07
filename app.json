@@ -25,7 +25,7 @@
         "backgroundColor": "#ffffff"
       },
       "package": "split.app.android",
-      "googleServicesFile": "$GOOGLE_SERVICES_JSON"
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "favicon": "./src/assets/images/favicon.png"

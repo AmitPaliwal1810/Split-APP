@@ -18,8 +18,8 @@ web-build/
 # macOS
 .DS_Store
 
-# Firebase - contains secret API keys, never commit these
-google-services.json
+# Firebase - contains secret API keys
+# google-services.json is tracked only for EAS build
 GoogleService-Info.plist
 
 # Build folders
