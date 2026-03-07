@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useLayoutEffect } from 'react';
 import {
   View,
   Text,
@@ -39,6 +39,28 @@ export const GroupDetailScreen: React.FC = () => {
   const [group, setGroup] = useState<Group | null>(null);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
+
+  useLayoutEffect(() => {
+    if (!group) return;
+    navigation.setOptions({
+      title: group.name,
+      headerRight: () => (
+        <TouchableOpacity
+          style={{ marginRight: 16 }}
+          onPress={() =>
+            navigation.navigate('EditGroup' as any, {
+              groupId,
+              currentName: group.name,
+              currentDescription: group.description || '',
+              currentCategory: (group as any).category || 'other',
+            })
+          }
+        >
+          <Ionicons name="create-outline" size={24} color={colors.primary} />
+        </TouchableOpacity>
+      ),
+    });
+  }, [group, navigation, groupId, colors.primary]);
 
   useEffect(() => {
     if (!firestore || !database) {

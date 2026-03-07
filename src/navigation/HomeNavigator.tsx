@@ -6,6 +6,7 @@ import { GroupDetailScreen } from '@screens/groups/GroupDetailScreen';
 import { CreateGroupScreen } from '@screens/groups/CreateGroupScreen';
 import { AddExpenseScreen } from '@screens/expense/AddExpenseScreen';
 import { AddMembersScreen } from '@screens/groups/AddMembersScreen';
+import { EditGroupScreen } from '@screens/groups/EditGroupScreen';
 import { ExpenseDetailScreen } from '@screens/expense/ExpenseDetailScreen';
 import { HomeStackParamList } from '@types/index';
 
@@ -50,6 +51,11 @@ export const HomeNavigator: React.FC = () => {
         name="AddMembers"
         component={AddMembersScreen}
         options={{ title: 'Add Members' }}
+      />
+      <Stack.Screen
+        name="EditGroup"
+        component={EditGroupScreen}
+        options={{ title: 'Edit Group' }}
       />
       <Stack.Screen
         name="ExpenseDetail"

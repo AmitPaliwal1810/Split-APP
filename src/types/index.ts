@@ -76,6 +76,7 @@ export type MainDrawerParamList = {
 export type HomeStackParamList = {
   HomeScreen: undefined;
   GroupDetail: { groupId: string };
+  EditGroup: { groupId: string; currentName: string; currentDescription?: string; currentCategory?: string };
   AddExpense: { groupId: string };
   ExpenseDetail: { expenseId: string; groupId: string };
   CreateGroup: undefined;

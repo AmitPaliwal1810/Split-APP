@@ -146,6 +146,24 @@ export const removeGroupMember = async (
 };
 
 /**
+ * Update group details (name, description, category)
+ */
+export const updateGroup = async (
+  groupId: string,
+  name: string,
+  description: string,
+  category: string
+): Promise<void> => {
+  const db = getFirestore();
+  await db.collection('groups').doc(groupId).update(sanitize({
+    name: (name || '').trim(),
+    description: (description || '').trim(),
+    category: category || 'other',
+    updatedAt: firestore.FieldValue.serverTimestamp(),
+  }));
+};
+
+/**
  * Delete a group and its expenses
  */
 export const deleteGroup = async (groupId: string): Promise<void> => {
