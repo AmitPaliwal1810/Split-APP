@@ -18,9 +18,9 @@ web-build/
 # macOS
 .DS_Store
 
-# Firebase (optional - you can keep these if you want to commit them)
-# google-services.json
-# GoogleService-Info.plist
+# Firebase - contains secret API keys, never commit these
+google-services.json
+GoogleService-Info.plist
 
 # Build folders
 android/
