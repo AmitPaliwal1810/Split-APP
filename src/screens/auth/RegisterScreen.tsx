@@ -23,6 +23,7 @@ type RegisterScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Reg
 
 interface RegisterFormData {
   email: string;
+  phoneNumber: string;
   password: string;
   confirmPassword: string;
 }
@@ -39,12 +40,18 @@ export const RegisterScreen: React.FC = () => {
   } = useForm<RegisterFormData>({
     defaultValues: {
       email: '',
+      phoneNumber: '',
       password: '',
       confirmPassword: '',
     },
   });
 
   const handleRegister = async (data: RegisterFormData) => {
+    if (!data.phoneNumber.trim()) {
+      Alert.alert('Error', 'Phone number is required');
+      return;
+    }
+
     if (data.password !== data.confirmPassword) {
       Alert.alert('Error', 'Passwords do not match');
       return;
@@ -57,7 +64,7 @@ export const RegisterScreen: React.FC = () => {
 
     setLoading(true);
     try {
-      await signUpWithEmail(data.email, data.password);
+      await signUpWithEmail(data.email, data.password, data.phoneNumber.trim());
       console.log('✅ Registration successful - Firebase auth listener will handle navigation');
       // Don't call setUser or setLoading(false) here
       // Firebase's onAuthStateChanged listener will automatically:
@@ -114,6 +121,15 @@ export const RegisterScreen: React.FC = () => {
               autoCapitalize="none"
               autoComplete="email"
               error={errors.email}
+            />
+
+            <FormInput
+              name="phoneNumber"
+              control={control}
+              placeholder="Phone Number (required)"
+              icon="call-outline"
+              keyboardType="phone-pad"
+              error={errors.phoneNumber}
             />
 
             <FormInput

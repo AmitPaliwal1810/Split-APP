@@ -35,6 +35,7 @@ export const AddMembersScreen: React.FC = () => {
   const { groupId } = route.params as { groupId: string };
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [filteredContacts, setFilteredContacts] = useState<Contact[]>([]);
+  const [appUserMap, setAppUserMap] = useState<Record<string, { id: string; displayName: string; photoURL?: string }>>({});
   const [searchQuery, setSearchQuery] = useState('');
   const [group, setGroup] = useState<Group | null>(null);
   const [loading, setLoading] = useState(false);
@@ -79,7 +80,7 @@ export const AddMembersScreen: React.FC = () => {
 
         if (data.length > 0) {
           const formattedContacts: Contact[] = data
-            .filter((c) => c.name) // only contacts with names
+            .filter((c) => c.name)
             .map((contact) => ({
               id: contact.id || String(Math.random()),
               name: contact.name || 'Unknown',
@@ -89,6 +90,36 @@ export const AddMembersScreen: React.FC = () => {
             .sort((a, b) => a.name.localeCompare(b.name));
           setContacts(formattedContacts);
           setFilteredContacts(formattedContacts);
+
+          // Check which contacts have the app by matching phone numbers in Firestore
+          if (firestore) {
+            const allPhoneNumbers = formattedContacts
+              .flatMap((c) => (c.phoneNumbers || []).map((p) => p.number?.replace(/\s+/g, '') || ''))
+              .filter(Boolean);
+
+            if (allPhoneNumbers.length > 0) {
+              // Firestore 'in' query supports max 30 items at a time
+              const chunks: string[][] = [];
+              for (let i = 0; i < allPhoneNumbers.length; i += 30) {
+                chunks.push(allPhoneNumbers.slice(i, i + 30));
+              }
+              const userMap: Record<string, { id: string; displayName: string; photoURL?: string }> = {};
+              for (const chunk of chunks) {
+                const snapshot = await firestore()
+                  .collection('users')
+                  .where('phoneNumber', 'in', chunk)
+                  .get();
+                snapshot.docs.forEach((doc: any) => {
+                  const d = doc.data();
+                  const phone = (d.phoneNumber || '').replace(/\s+/g, '');
+                  if (phone) {
+                    userMap[phone] = { id: doc.id, displayName: d.displayName || 'User', photoURL: d.photoURL };
+                  }
+                });
+              }
+              setAppUserMap(userMap);
+            }
+          }
         }
       } else {
         Alert.alert('Permission Denied', 'Cannot access contacts without permission');
@@ -166,10 +197,31 @@ export const AddMembersScreen: React.FC = () => {
     }
   };
 
+  const getAppUser = (contact: Contact) => {
+    for (const p of (contact.phoneNumbers || [])) {
+      const normalized = (p.number || '').replace(/\s+/g, '');
+      if (appUserMap[normalized]) return appUserMap[normalized];
+    }
+    return null;
+  };
+
+  const handleAddAppUser = async (appUser: { id: string; displayName: string; photoURL?: string }) => {
+    if (!user) return;
+    setLoading(true);
+    try {
+      await addGroupMember(groupId, appUser.id, appUser.displayName, appUser.photoURL);
+      Alert.alert('Success', `${appUser.displayName} added to the group!`);
+      loadGroup();
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to add member');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const renderContactItem = ({ item }: { item: Contact }) => {
-    const isMember = group?.members?.some(
-      (m) => m.displayName === item.name
-    );
+    const isMember = group?.members?.some((m) => m.displayName === item.name);
+    const appUser = getAppUser(item);
 
     return (
       <View style={[styles.contactCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -179,7 +231,14 @@ export const AddMembersScreen: React.FC = () => {
           </Text>
         </View>
         <View style={styles.contactInfo}>
-          <Text style={[styles.contactName, { color: colors.text }]}>{item.name}</Text>
+          <View style={styles.nameRow}>
+            <Text style={[styles.contactName, { color: colors.text }]}>{item.name}</Text>
+            {appUser && (
+              <View style={[styles.appBadge, { backgroundColor: colors.primary + '20' }]}>
+                <Text style={[styles.appBadgeText, { color: colors.primary }]}>On App</Text>
+              </View>
+            )}
+          </View>
           {item.phoneNumbers && item.phoneNumbers.length > 0 && (
             <Text style={[styles.contactPhone, { color: colors.textSecondary }]}>
               {item.phoneNumbers[0].number}
@@ -190,6 +249,14 @@ export const AddMembersScreen: React.FC = () => {
           <View style={[styles.memberBadge, { backgroundColor: colors.success + '20' }]}>
             <Text style={[styles.memberBadgeText, { color: colors.success }]}>Member</Text>
           </View>
+        ) : appUser ? (
+          <TouchableOpacity
+            style={[styles.addButton, { backgroundColor: colors.primary }]}
+            onPress={() => handleAddAppUser(appUser)}
+            disabled={loading}
+          >
+            <Ionicons name="person-add" size={16} color="#fff" />
+          </TouchableOpacity>
         ) : (
           <TouchableOpacity
             style={[styles.inviteButton, { borderColor: colors.primary }]}
@@ -206,7 +273,7 @@ export const AddMembersScreen: React.FC = () => {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Add by email section */}
       <View style={[styles.addByEmailSection, { backgroundColor: colors.card }]}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Add by Email</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Search by Email</Text>
         <View style={styles.emailRow}>
           <TextInput
             style={[styles.emailInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
@@ -333,6 +400,12 @@ const styles = StyleSheet.create({
   contactInfo: {
     flex: 1,
   },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexWrap: 'wrap',
+  },
   contactName: {
     fontSize: 15,
     fontWeight: '600',
@@ -340,6 +413,23 @@ const styles = StyleSheet.create({
   },
   contactPhone: {
     fontSize: 13,
+  },
+  appBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    marginBottom: 2,
+  },
+  appBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  addButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   inviteButton: {
     paddingHorizontal: 16,

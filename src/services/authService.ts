@@ -59,7 +59,7 @@ console.log('🔥 Auth Service Initialized');
 console.log('✅ Firebase available:', isFirebaseAvailable);
 console.log('✅ Google Sign-In available:', !!GoogleSignin);
 
-export const signUpWithEmail = async (email: string, password: string): Promise<User> => {
+export const signUpWithEmail = async (email: string, password: string, phoneNumber?: string): Promise<User> => {
   console.log('📝 signUpWithEmail called with:', email);
   console.log('🔥 Firebase Auth available:', !!auth);
   console.log('🔥 Firebase Firestore available:', !!firestore);
@@ -84,6 +84,7 @@ export const signUpWithEmail = async (email: string, password: string): Promise<
       email: firebaseUser.email!,
       displayName: firebaseUser.displayName?.trim() || '',
       photoURL: firebaseUser.photoURL || undefined,
+      phoneNumber: phoneNumber || '',
       createdAt: now,
       updatedAt: now,
       needsProfileSetup: true,
@@ -94,6 +95,7 @@ export const signUpWithEmail = async (email: string, password: string): Promise<
       sanitizeFirestoreData({
         ...user,
         photoURL: firebaseUser.photoURL ?? null,
+        phoneNumber: phoneNumber || '',
         createdAt: firestore.FieldValue.serverTimestamp(),
         updatedAt: firestore.FieldValue.serverTimestamp(),
         needsProfileSetup: true,
