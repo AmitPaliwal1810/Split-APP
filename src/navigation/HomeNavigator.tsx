@@ -31,7 +31,7 @@ export const HomeNavigator: React.FC = () => {
       <Stack.Screen
         name="HomeScreen"
         component={HomeScreen}
-        options={{ title: 'Split Bills' }}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         name="GroupDetail"
