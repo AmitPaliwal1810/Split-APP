@@ -8,7 +8,9 @@ import {
   StyleSheet,
   RefreshControl,
   ActivityIndicator,
+  StatusBar,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useAuth } from '@contexts/AuthContext';
@@ -134,7 +136,8 @@ export const HomeScreen: React.FC = () => {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+      <StatusBar barStyle="dark-content" backgroundColor={colors.card} />
       <View style={[styles.header, { backgroundColor: colors.card }]}>
         <Text style={[styles.headerTitle, { color: colors.text }]}>Split Bills</Text>
         <TouchableOpacity
@@ -182,7 +185,7 @@ export const HomeScreen: React.FC = () => {
       >
         <Ionicons name="add" size={32} color="#fff" />
       </TouchableOpacity>
-    </View>
+    </SafeAreaView>
   );
 };
 

@@ -9,7 +9,9 @@ import {
   Alert,
   ActivityIndicator,
   Platform,
+  StatusBar,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useForm } from 'react-hook-form';
 import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
@@ -179,7 +181,9 @@ export const ProfileScreen: React.FC = () => {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <StatusBar barStyle="light-content" backgroundColor={colors.primary} />
       {/* Top - Profile Section */}
+      <SafeAreaView edges={['top']} style={{ backgroundColor: colors.primary }}>
       <View style={[styles.profileTop, { backgroundColor: colors.primary }]}>
         <TouchableOpacity style={styles.avatarContainer} onPress={handlePickImage} disabled={loading}>
           {user?.photoURL ? (
@@ -203,6 +207,7 @@ export const ProfileScreen: React.FC = () => {
         <Text style={styles.userName}>{user?.displayName || 'User'}</Text>
         <Text style={styles.userEmail}>{user?.email}</Text>
       </View>
+      </SafeAreaView>
 
       <ScrollView style={styles.menuContainer}>
         {/* Edit Profile form or menu item */}
